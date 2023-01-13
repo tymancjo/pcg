@@ -32,8 +32,8 @@ clock = pygame.time.Clock()     ## For syncing the FPS
 
 # PCG things
 
-rows = 100
-cols = 100
+rows = 50
+cols = 50
 
 pixelCellW = int(WIDTH / cols)
 pixelCellH = int(HEIGHT / rows)
@@ -53,7 +53,9 @@ deltaTick = 5
 makeStep = 0
 sourceActive = False
 editMode = False
+drawing = False
 subSteps = 1
+isGas = False
 
 #cell = pcg.Cell()
 #cell.T = 100
@@ -76,27 +78,55 @@ while running:
                 
                 if not editMode and sourceActive:
                     mouseRow, mouseCol = sourcePos
+
+            if event.key == pygame.K_s:
+                isGas = False
                     
+            if event.key == pygame.K_r:
+                isGas = True
+
+            if event.key == pygame.K_h:
+
+                sourceActive = not sourceActive
 
 
         # handle MOUSEBUTTONUP
-        if event.type == pygame.MOUSEBUTTONUP:
+        if event.type == pygame.MOUSEBUTTONDOWN:
+
             pos = pygame.mouse.get_pos()
 
             mouseRow = math.floor(pos[1] / pixelCellH)
             mouseCol = math.floor(pos[0] / pixelCellW)
 
-            if editMode:
-                theGrid[mouseRow][mouseCol].gas = not theGrid[mouseRow][mouseCol].gas 
+            drawing = True
 
-                theGrid[mouseRow][mouseCol].update()
-            
-            else:
+            if not editMode:
                 if event.button == 1:
                     sourceActive = True
                 else:
-                    sourceActive = False
+                    sourceActive = not True
 
+
+
+
+        if event.type == pygame.MOUSEMOTION:
+
+            if drawing:
+                pos = pygame.mouse.get_pos()
+
+                mouseRow = math.floor(pos[1] / pixelCellH)
+                mouseCol = math.floor(pos[0] / pixelCellW)
+
+                if editMode:
+                    theGrid[mouseRow][mouseCol].gas = isGas 
+                    theGrid[mouseRow][mouseCol].update()
+
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            drawing = False
+
+            
+            
                     
             
 
@@ -121,8 +151,10 @@ while running:
     #if makeStep > 1:
     if not editMode:
         for _ in range(subSteps):
-            pcg.segregator(theGrid, cols, rows, ht=0.005)
-            pcg.borders(theGrid, hs=0.01, ht=0, h=0)
+            ht = rows*cols*(0.05 / 40000)
+
+            pcg.segregator(theGrid, cols, rows, ht=ht)
+            pcg.borders(theGrid, hs=0.0, ht=0, h=20)
 
             if sourceActive:
                 theGrid[mouseRow][mouseCol].T += 100

@@ -39,35 +39,54 @@ def borders(Grid,ht=0.01, hs=0.02,h=0):
         row[-1].update()
 
 def segregator(Grid, cols, rows, ht=0.05):
+    '''
+    This procedure manage the main air convection simulation.
+    It is somehow simmilar to cellular automata of a kind. 
 
+    it is about transitting temperature to the cells left right and below. And if the temp of the cell is bigger than the average od left bottom and right one - the cell moves up.
+
+    To eliminate the numerical viscocity the rows are analyzed from left to right and from right to left alternativly. 
+
+    '''
+
+    direction = -1
     for row,cellRow in enumerate(Grid):
 
-        for col,cell in enumerate(cellRow):
+        direction *= -1
+        for col,cell in enumerate(cellRow[::direction]):
+            if direction == -1:
+                col = cols - col - 1
 
             # heating cells around
             if  col < cols-1:
-                cellR = cellRow[col + 1]
 
-                if cell.T > cellR.T and cellR.gas:
-                    cellR.T += ht*cell.T
-                    cell.T -= ht*cell.T
-                    cellR.update()           
+                cell2 = cellRow[col + 1]
+                cellR = cell2
+                dT = cell.T - cell2.T
+                if dT > 0 and cell2.gas:
+                    cell2.T += ht*dT
+                    cell.T -= ht*dT
+                    cell2.update()           
 
             if  col > 0:
-                cellL = cellRow[col-1]
 
-                if cell.T > cellL.T and cellL.gas:
-                    cellL.T += ht*cell.T
-                    cell.T -= ht*cell.T
-                    cellL.update()           
+                cell2 = cellRow[col-1]
+                cellL = cell2
+                dT = cell.T - cell2.T
+                if dT > 0 and cell2.gas:
+                    cell2.T += ht*dT
+                    cell.T -= ht*dT
+                    cell2.update()           
 
             if row < rows-1:
-                cellB = Grid[row+1][col]
 
-                if cell.T > cellB.T and cellB.gas:
-                    cellB.T += ht*cell.T
-                    cell.T -= ht*cell.T
-                    cellB.update()           
+                cell2 = Grid[row+1][col]
+                cellB = cell2
+                dT = cell.T - cell2.T
+                if dT > 0 and cell2.gas:
+                    cell2.T += ht*dT
+                    cell.T -= ht*dT
+                    cell2.update()           
 
             
 
@@ -78,19 +97,13 @@ def segregator(Grid, cols, rows, ht=0.05):
                     #trying to go up
                     cellUp = Grid[row-1][col]
                     if cell.T > cellUp.T and cellUp.gas:
-                        #cell.x, cellUp.x = cellUp.x, cell.x
-                        #cell.y, cellUp.y = cellUp.y, cell.y
                         cell.T, cellUp.T = cellUp.T, cell.T
-                        pass
                         cellUp.update()
                     else:
                         cellUp = Grid[row-1][min(col+1,cols-1)]
 
                         if cell.T > cellUp.T and cellUp.gas:
-                            #cell.x, cellUp.x = cellUp.x, cell.x
-                            #cell.y, cellUp.y = cellUp.y, cell.y
                             cell.T, cellUp.T = cellUp.T, cell.T
-                            pass
                             cellUp.update()
                             
                         else:
@@ -98,10 +111,7 @@ def segregator(Grid, cols, rows, ht=0.05):
                             cellUp = Grid[row-1][max(col-1,0)]
 
                             if cell.T > cellUp.T and cellUp.gas:
-                                #cell.x, cellUp.x = cellUp.x, cell.x
-                                #cell.y, cellUp.y = cellUp.y, cell.y
                                 cell.T, cellUp.T = cellUp.T, cell.T
-                                pass
                                 cellUp.update()
                             
             cell.update()
