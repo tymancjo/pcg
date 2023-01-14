@@ -164,7 +164,7 @@ while running:
         for _ in range(subSteps):
             ht = rows * cols * (0.5 / 40000)
 
-            pcg.segregator(theGrid, cols, rows, ht=ht, g=gravity)
+            pcg.segregator2(theGrid, cols, rows, ht=ht, g=gravity)
             pcg.borders(theGrid, hs=0.02, ht=1, h=0)
 
             if sourceActive:
