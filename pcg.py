@@ -1,5 +1,20 @@
 # This is a library file for the PCG experiment
 import cmap as cc
+import pickle
+
+
+class dataKeeper:
+    def __init__(
+        self, grid, width, height, rows, cols, sourceActive, mouseRow, mouseCol
+    ):
+        self.grid = grid
+        self.width = width
+        self.height = height
+        self.rows = rows
+        self.cols = cols
+        self.sourceActive = sourceActive
+        self.mouseRow = mouseRow
+        self.mouseCol = mouseCol
 
 
 class Cell:
@@ -14,14 +29,13 @@ class Cell:
 
         self.color = (255, 255, 255)
 
+        self.dP = 0
+
         self.update()
 
     def update(self):
         self.T = clamp(self.T)
-        if self.gas:
-            self.color = getColor(self.T)
-        else:
-            self.color = (10, 10, 10)
+        self.color = getColor(self.T)
 
 
 def borders(Grid, ht=0.01, hs=0.02, h=0):
@@ -147,7 +161,7 @@ def segregator(Grid, cols, rows, ht=0.05, g=True):
             cell.update()
 
 
-def heatConduction(cellA, cellB, htc=1, area=0.01 * 1, length=0.01, dt=1):
+def heatConduction(cellA, cellB, htc=1, area=0.01 * 1, length=0.01, dt=1 / 10):
 
     dT = cellA.T - cellB.T
     if cellA.gas and cellB.gas:
@@ -180,7 +194,7 @@ def heatConduction(cellA, cellB, htc=1, area=0.01 * 1, length=0.01, dt=1):
         cellB.update()
 
 
-def segregator2(Grid, cols, rows, ht=0.05, g=True, dt=1e-3):
+def airSim(Grid, cols, rows, ht=0.05, g=True, dt=1e-9):
     """
     This procedure manage the main air convection simulation.
     It is somehow similar to cellular automata of a kind.
@@ -199,28 +213,40 @@ def segregator2(Grid, cols, rows, ht=0.05, g=True, dt=1e-3):
             if direction == -1:
                 col = cols - col - 1
 
-            if cell.gas:  # if this is a gas cell
+            # let's make it in the wat that we will deal with the:
+            # heat generation
+            # conduction
+            # convection
 
-                # heat exchange to ajected cells
+            if True:
+                # As this conduction part is for all type of cells.
+
+                # heat exchange to neighbor cells
+                # left
                 if col < cols - 1:
                     cell2 = cellRow[col + 1]
                     cellR = cell2
                     heatConduction(cell, cell2)
 
+                # right
                 if col > 0:
                     cell2 = cellRow[col - 1]
                     cellL = cell2
                     heatConduction(cell, cell2)
 
+                # below
                 if row < rows - 1:
                     cell2 = Grid[row + 1][col]
                     cellB = cell2
                     heatConduction(cell, cell2)
 
+                # above
                 if row > 0:
                     cell2 = Grid[row - 1][col]
                     cellT = cell2
                     heatConduction(cell, cell2)
+
+            if cell.gas:  # if this is a gas cell
 
                 # look up - convection
                 if row > 0 and g:
@@ -249,11 +275,10 @@ def segregator2(Grid, cols, rows, ht=0.05, g=True, dt=1e-3):
                                 else:  # no way to move up.
                                     heatConduction(cell, cellL)
                                     heatConduction(cell, cellR)
+            else:
+                # taking care of the not gas cell.
+                pass
 
-                                    # if cellB.gas and 0:
-                                    #     cellB.T += ht * 2 * cell.T
-                                    #     cell.T -= ht * 2 * cell.T
-                                    #     cellR.update()
             cell.update()
 
 
@@ -261,7 +286,7 @@ def clamp(A: int, minimum=0, maximum=254):
     return min(maximum, max(minimum, A))
 
 
-def getColor(A: int, minimum=0, maximum=64):
+def getColor(A: int, minimum=0, maximum=200):
     A = clamp(A, minimum, maximum)
     A = int((A - minimum) / (maximum - minimum) * 255)
 

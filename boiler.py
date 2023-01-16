@@ -7,8 +7,8 @@ import pcg
 
 # PCG things
 
-rows = 50
-cols = 50
+rows = 100
+cols = 100
 
 
 WIDTH = int(800 / cols) * cols
@@ -155,17 +155,24 @@ while running:
 
     for row in theGrid:
         for cell in row:
-            pygame.draw.rect(
-                screen, cell.color, pygame.Rect(cell.x, cell.y, cell.w, cell.h)
-            )
+            if cell.gas:
+                pygame.draw.rect(
+                    screen, cell.color, pygame.Rect(cell.x, cell.y, cell.w, cell.h)
+                )
+            else:
+                pygame.draw.rect(
+                    screen,
+                    cell.color,
+                    pygame.Rect(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2),
+                )
 
     # if makeStep > 1:
     if not editMode:
         for _ in range(subSteps):
             ht = rows * cols * (0.5 / 40000)
 
-            pcg.segregator2(theGrid, cols, rows, ht=ht, g=gravity)
-            pcg.borders(theGrid, hs=0.02, ht=1, h=0)
+            pcg.airSim(theGrid, cols, rows, ht=ht, g=gravity)
+            pcg.borders(theGrid, hs=0.9, ht=0, h=0)
 
             if sourceActive:
                 theGrid[mouseRow][mouseCol].T += 100
