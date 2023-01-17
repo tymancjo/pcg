@@ -1,6 +1,10 @@
 import pygame
 import random
 import math
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+
 
 import pcg
 
@@ -8,12 +12,12 @@ import pcg
 # PCG things
 
 rows = 100
-cols = 100
+cols = 60
 
 
 WIDTH = int(800 / cols) * cols
 HEIGHT = int(800 / rows) * rows
-FPS = 200
+FPS = 500
 
 pixelCellW = int(WIDTH / cols)
 pixelCellH = int(HEIGHT / rows)
@@ -25,17 +29,105 @@ theGrid = [
             y=pixelCellH * y,
             w=pixelCellW,
             h=pixelCellH,
-            temperature=0 * random.random() * 254,
+            temperature=0,
         )
         for x in range(cols)
     ]
     for y in range(rows)
 ]
 
+MT = np.zeros_like(theGrid) + 1
+print(MT.shape)
 
-# testing the obstacle
-for cell in theGrid[23][30:45]:
-    cell.gas = False
+timeV = []
+maxTV = []
+
+dt = 1 / 5
+N = 2
+
+
+copper = pcg.material()
+copper.gas = False
+copper.cp = 385  # J/kg.K
+copper.Sigma = 400e-0  # W/m.K
+copper.ro = 8830  # kg/m3
+
+stell = pcg.material()
+stell.gas = False
+stell.cp = 0.88e3  # J/kg.K
+stell.Sigma = 55  # W/m.K
+stell.ro = 8000  # kg/m3
+
+# testing the obstacle made of steel.
+# for cell in theGrid[5][15:35]:
+#     cell.material = stell
+#     # cell.gas = false
+#     # cell.cp = 0.88e3  # j/kg.k
+#     # cell.sigma = 55  # w/m.k
+#     # cell.ro = 8000  # kg/m3
+#     cell.updateData()
+
+# testing the source cells made of copper
+A = 10
+a = 20
+B = 25
+startT = 00
+
+bH = 3
+
+srcCells = []
+
+for r in [A + a, A + a + 5, 16 + A + a, 16 + A + a + 5, 32 + A + a, 32 + A + a + 5]:
+    # for r in [A + 20, A + 30, A + 40]:
+    for row in theGrid[r : r + bH]:
+        for cell in row[B : B + 5 : 2]:
+            cell.dP = 10  # W
+            cell.material = copper
+            # cell.gas = False
+            # cell.cp = 1.46e3  # J/kg.K
+            # cell.Sigma = 400  # W/m.k
+            # cell.ro = 8940  # kg/m3
+            cell.T = startT
+            cell.updateData()
+            srcCells.append(cell)
+    if bH == 3:
+        bH = 4
+    else:
+        bH = 3
+
+loads = []
+
+a = 8
+b = 5.6
+c = 8
+d = 16.5
+e = 13
+f = 16.5
+loads1 = [a, b, c, a, b, c, a, b, c, d, e, f, d, e, f, d, e, f, d, e, f]
+loads.extend(loads1)
+
+a = 14.7
+b = 9.7
+c = 14.7
+d = 16.5
+e = 14
+f = 16.5
+loads1 = [a, b, c, a, b, c, a, b, c, d, e, f, d, e, f, d, e, f, d, e, f]
+loads.extend(loads1)
+
+a = 21.3
+b = 15
+c = 21.3
+d = 7.7
+e = 5.75
+f = 7.7
+loads1 = [a, b, c, a, b, c, a, b, c, d, e, f, d, e, f, d, e, f, d, e, f]
+loads.extend(loads1)
+
+for n, cell in enumerate(srcCells):
+    cell.dP = loads[n]
+
+
 # Define Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -65,14 +157,15 @@ sourceActive = False
 editMode = False
 drawing = False
 subSteps = 1
-isGas = False
+isGas = pcg.powietrze
 gravity = True
 reading = 0
 mouseR = mouseC = 0
-
+simTime = 0
 # cell = pcg.Cell()
 # cell.T = 100
 # cell.update()
+
 
 while running:
     # 1 Process input/events
@@ -97,10 +190,10 @@ while running:
                     mouseRow, mouseCol = sourcePos
 
             if event.key == pygame.K_s:
-                isGas = False
+                isGas = stell
 
             if event.key == pygame.K_r:
-                isGas = True
+                isGas = pcg.powietrze
 
             if event.key == pygame.K_h:
 
@@ -135,7 +228,8 @@ while running:
             if drawing:
                 mouseRow, mouseCol = mouseR, mouseC
                 if editMode:
-                    theGrid[mouseRow][mouseCol].gas = isGas
+                    theGrid[mouseRow][mouseCol].material = isGas
+                    theGrid[mouseRow][mouseCol].updateData()
                     theGrid[mouseRow][mouseCol].update()
 
             else:
@@ -169,19 +263,31 @@ while running:
     # if makeStep > 1:
     if not editMode:
         for _ in range(subSteps):
-            ht = rows * cols * (0.5 / 40000)
 
-            pcg.airSim(theGrid, cols, rows, ht=ht, g=gravity)
-            pcg.borders(theGrid, hs=0.9, ht=0, h=0)
+            currentMax = MT.max()
+
+            pcg.airSim(
+                theGrid, MT, cols, rows, g=gravity, dt=dt, maxT=currentMax, convN=N
+            )
+            pcg.borders(theGrid, hs=0.9, ht=0.5, h=0)
 
             if sourceActive:
                 theGrid[mouseRow][mouseCol].T += 100
                 theGrid[mouseRow][mouseCol].update()
 
             reading = theGrid[mouseR][mouseC].T
+            simTime += dt
 
-            text_surface = font.render(str(reading).encode(), True, (0, 0, 0))
+            simH = math.floor(simTime / 3600)
+            simMin = math.floor((simTime - simH * 3600) / 60)
+            simSec = math.floor(simTime - simH * 3600 - simMin * 60)
+
+            text_string = f"dT:{reading:.4f} / maxT: {currentMax:.4f} K time: {simH:02d}:{simMin:02d}:{simSec:02d}".encode()
+            text_surface = font.render(text_string, True, (0, 0, 0))
             screen.blit(text_surface, dest=(0, 0))
+
+            timeV.append(simTime)
+            maxTV.append(currentMax)
 
     else:
         pygame.draw.rect(screen, (255, 0, 0), pygame.Rect(0, 0, 20, 20))
@@ -195,5 +301,8 @@ while running:
 
     ## Done after drawing everything to the screen
     pygame.display.flip()
+
+plt.plot(timeV, maxTV)
+plt.show()
 
 pygame.quit()

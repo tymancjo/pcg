@@ -1,6 +1,7 @@
 # This is a library file for the PCG experiment
 import cmap as cc
 import pickle
+import numpy
 
 
 class dataKeeper:
@@ -17,9 +18,25 @@ class dataKeeper:
         self.mouseCol = mouseCol
 
 
+class material:
+    def __init__(self):
+        # default as air
+        self.cp = 1.003e3  # J/kg K
+        self.ro = 1.29  # kg/m^3
+        self.Sigma = 26e-3  # W/mK
+        self.gas = True
+
+
+# Materiały
+
+powietrze = material()
+
+
 class Cell:
     def __init__(self, x=0, y=0, w=10, h=10, gas=True, temperature=0):
-        self.gas = gas
+        self.material = powietrze
+
+        self.gas = self.material.gas
         self.T = temperature
         self.x = x
         self.y = y
@@ -30,12 +47,28 @@ class Cell:
         self.color = (255, 255, 255)
 
         self.dP = 0
+        self.area = 0.01 * 1
+        self.length = 0.01
 
+        self.updateData()
         self.update()
 
-    def update(self):
-        self.T = clamp(self.T)
-        self.color = getColor(self.T)
+    def updateData(self):
+        self.mass = self.area * self.length * self.material.ro
+
+        self.Rth = 0.5 * self.length / (self.area * self.material.Sigma)
+
+        self.gas = self.material.gas
+
+    def calc(self, dQ):
+        self.T += dQ / (self.mass * self.material.cp)
+
+    def update(self, maxT=255):
+        # self.T = clamp(self.T)
+        self.color = getColor(self.T, minimum=0, maximum=maxT)
+
+    def heat(self, dt):
+        self.calc(self.dP * dt)
 
 
 def borders(Grid, ht=0.01, hs=0.02, h=0):
@@ -44,7 +77,7 @@ def borders(Grid, ht=0.01, hs=0.02, h=0):
     A = 1 - ht
     for cell in Grid[0]:
         cell.T *= A
-        cell.update()
+        # cell.update()
     A = 1 - hs
 
     for row in Grid[h:]:
@@ -161,40 +194,26 @@ def segregator(Grid, cols, rows, ht=0.05, g=True):
             cell.update()
 
 
-def heatConduction(cellA, cellB, htc=1, area=0.01 * 1, length=0.01, dt=1 / 10):
+def heatGeneration(cell, dt=1 / 1000):
+    cell.calc(cell.dP * dt)
 
+
+def heatConduction(cellA, cellB, dt=1 / 1000):
     dT = cellA.T - cellB.T
-    if cellA.gas and cellB.gas:
 
-        roAir = 1.29  # kg/m3
-        mass = area * length * roAir  # kg
+    # Power transferred
+    heatSigma = 1 / (cellA.Rth + cellB.Rth)
+    dP = dT * heatSigma
+    dQ = dP * dt
 
-        # Air thermal conductivity
-        # 26 mW/mK = 26e-3 W/mK
-        airSigma = 26e-3
+    cellA.calc(-dQ)
+    cellB.calc(dQ)
 
-        # thermal conduction
-        airS = area * airSigma / length
-
-        # (T1-T2)*S = Q (to było Q? czy P... hmmm)
-        dP = dT * airS
-        dQ = dP * dt
-
-        # ciepło właściwe
-        # [J/kgK] -> cp=Q/m.dT
-        # dT = Q/m.cp
-        cpAir = 1.003e3  # J/kg K
-
-        deltaT = dQ / (mass * cpAir)
-
-        cellA.T -= deltaT
-        cellB.T += deltaT
-
-        cellA.update()
-        cellB.update()
+    # cellA.update()
+    # cellB.update()
 
 
-def airSim(Grid, cols, rows, ht=0.05, g=True, dt=1e-9):
+def airSim(Grid, arrT, cols, rows, g=True, dt=1e-9, maxT=255, convN=10):
     """
     This procedure manage the main air convection simulation.
     It is somehow similar to cellular automata of a kind.
@@ -218,6 +237,10 @@ def airSim(Grid, cols, rows, ht=0.05, g=True, dt=1e-9):
             # conduction
             # convection
 
+            # heat generation
+            cell.heat(dt)
+            # heatGeneration(cell)
+
             if True:
                 # As this conduction part is for all type of cells.
 
@@ -226,71 +249,76 @@ def airSim(Grid, cols, rows, ht=0.05, g=True, dt=1e-9):
                 if col < cols - 1:
                     cell2 = cellRow[col + 1]
                     cellR = cell2
-                    heatConduction(cell, cell2)
+                    heatConduction(cell, cell2, dt=dt)
 
                 # right
                 if col > 0:
                     cell2 = cellRow[col - 1]
                     cellL = cell2
-                    heatConduction(cell, cell2)
+                    heatConduction(cell, cell2, dt=dt)
 
                 # below
                 if row < rows - 1:
                     cell2 = Grid[row + 1][col]
                     cellB = cell2
-                    heatConduction(cell, cell2)
+                    heatConduction(cell, cell2, dt=dt)
 
                 # above
                 if row > 0:
                     cell2 = Grid[row - 1][col]
                     cellT = cell2
-                    heatConduction(cell, cell2)
+                    heatConduction(cell, cell2, dt=dt)
 
             if cell.gas:  # if this is a gas cell
+                # the idea to speed up the simulation is to
+                # make 5 time more up moves than the convection ones.
+                # it's for now only as a kind of hacking thing
 
-                # look up - convection
-                if row > 0 and g:
-                    if cell.T > cellL.T or cell.T > cellR.T:
-                        # if we are hotter than others around
-                        # trying to go up
-                        cellUp = Grid[row - 1][col]
-                        if cell.T > cellUp.T and cellUp.gas:
-                            cell.T, cellUp.T = cellUp.T, cell.T
-                            cellUp.update()
-                        else:
-                            cellUp = Grid[row - 1][min(col + 1, cols - 1)]
-
+                for _ in range(convN):
+                    # look up - convection
+                    if row > 0 and g:
+                        if cell.T > cellL.T or cell.T > cellR.T:
+                            # if we are hotter than others around
+                            # trying to go up
+                            cellUp = Grid[row - 1][col]
                             if cell.T > cellUp.T and cellUp.gas:
                                 cell.T, cellUp.T = cellUp.T, cell.T
-                                cellUp.update()
-
+                                # cellUp.update(maxT)
                             else:
-
-                                cellUp = Grid[row - 1][max(col - 1, 0)]
+                                cellUp = Grid[row - 1][min(col + 1, cols - 1)]
 
                                 if cell.T > cellUp.T and cellUp.gas:
                                     cell.T, cellUp.T = cellUp.T, cell.T
-                                    cellUp.update()
+                                    # cellUp.update(maxT)
 
-                                else:  # no way to move up.
-                                    heatConduction(cell, cellL)
-                                    heatConduction(cell, cellR)
+                                else:
+
+                                    cellUp = Grid[row - 1][max(col - 1, 0)]
+
+                                    if cell.T > cellUp.T and cellUp.gas:
+                                        cell.T, cellUp.T = cellUp.T, cell.T
+                                        # cellUp.update(maxT)
+
+                                    else:  # no way to move up.
+                                        heatConduction(cell, cellL, dt=dt)
+                                        heatConduction(cell, cellR, dt=dt)
             else:
                 # taking care of the not gas cell.
                 pass
 
-            cell.update()
+            arrT[row][col] = cell.T
+            cell.update(maxT=maxT)
 
 
 def clamp(A: int, minimum=0, maximum=254):
     return min(maximum, max(minimum, A))
 
 
-def getColor(A: int, minimum=0, maximum=200):
-    A = clamp(A, minimum, maximum)
+def getColor(A, minimum=0, maximum=200):
+    # A = clamp(A, minimum, maximum)
     A = int((A - minimum) / (maximum - minimum) * 255)
 
-    return cc.cmap[A]
+    return cc.cmap[max(0, min(A, 255))]
 
 
 def getColorOld(A: int, minimum=0, maximum=254):
