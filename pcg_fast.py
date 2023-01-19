@@ -1,7 +1,7 @@
 # This is a library file for the PCG experiment
 import cmap as cc
 import pickle
-import numpy
+import numpy as np
 from numba import njit
 
 
@@ -247,3 +247,143 @@ def getColorOld(A: int, minimum=0, maximum=254):
     B = 255 - A
 
     return (R, G, B)
+
+    # the plan for a faster solution compatible with numba
+    #
+    # not use the objects, but define the separate matrices (arrays) for the values
+    #
+    # T_array
+    # dP_array
+    # Rth_array
+    # massCp_array
+    #
+    # those can be prepared based on the world grid list by a pre-processor.
+
+
+def pre_processor(the_grid):
+    # initially just for convenience to get the shape right
+    grid_as_array = np.array(the_grid)
+    the_shape = grid_as_array.shape
+
+    # now let's make the required arrays of values.
+    T_array = np.zeros(the_shape)
+    dP_array = np.zeros(the_shape)
+    Rth_array = np.zeros(the_shape)
+    massCp_array = np.zeros(the_shape)
+    gas_array = np.zeros(the_shape)
+
+    # now let's fill them up with the data:
+    for r, row in enumerate(the_grid):
+        for c, cell in enumerate(row):
+            T_array[r, c] = cell.T
+            dP_array[r, c] = cell.dP
+            Rth_array[r, c] = cell.Rth
+            massCp_array[r, c] = cell.massCp
+            gas_array[r, c] = cell.gas
+
+    return T_array, dP_array, Rth_array, massCp_array, gas_array
+
+
+def solve_heat(T_array, dP_array, massCp_array, dt=1 / 100):
+    rows, cols = T_array.shape
+
+    for r in range(1, rows - 1):
+        for c in range(1, cols - 1):
+            T_array[r, c] += dP_array[r, c] * dt / massCp_array[r, c]
+
+
+@njit
+def solve_cond(T_array, dP_array, massCp_array, Rth_array, dt=1 / 100):
+    rows, cols = T_array.shape
+    direction = True
+
+    for r in range(1, rows - 1):
+        # if direction:
+        #     start = 1
+        #     end = cols - 1
+        # else:
+        #     start = cols - 1
+        #     end = 1
+        # direction = not direction
+
+        for c in range(1, cols - 1):
+            # for c in range(start, end):
+
+            # heat generation temp rise
+            T_array[r, c] += dP_array[r, c] * dt / massCp_array[r, c]
+
+            # Thermal conduction
+            # to the left
+            DT = T_array[r, c] - T_array[r, c - 1]
+            heatSigma = 1 / (Rth_array[r, c] + Rth_array[r, c - 1])
+            dP = DT * heatSigma
+            dQ = dP * dt
+            T_array[r, c] -= dQ / massCp_array[r, c]
+            T_array[r, c - 1] += dQ / massCp_array[r, c - 1]
+
+            # to the right
+            DT = T_array[r, c] - T_array[r, c + 1]
+            heatSigma = 1 / (Rth_array[r, c] + Rth_array[r, c + 1])
+            dP = DT * heatSigma
+            dQ = dP * dt
+            T_array[r, c] -= dQ / massCp_array[r, c]
+            T_array[r, c + 1] += dQ / massCp_array[r, c + 1]
+
+            # to the top
+            DT = T_array[r, c] - T_array[r - 1, c]
+            heatSigma = 1 / (Rth_array[r, c] + Rth_array[r - 1, c])
+            dP = DT * heatSigma
+            dQ = dP * dt
+            T_array[r, c] -= dQ / massCp_array[r, c]
+            T_array[r - 1, c] += dQ / massCp_array[r - 1, c]
+
+            # to the bottom
+            DT = T_array[r, c] - T_array[r + 1, c]
+            heatSigma = 1 / (Rth_array[r, c] + Rth_array[r + 1, c])
+            dP = DT * heatSigma
+            dQ = dP * dt
+            T_array[r, c] -= dQ / massCp_array[r, c]
+            T_array[r + 1, c] += dQ / massCp_array[r + 1, c]
+
+
+@njit
+def solve_conv(T_array, gas_array, dt=1 / 100):
+
+    rows, cols = T_array.shape
+
+    for r in range(1, rows - 1):
+        for c in range(1, cols - 1):
+            if gas_array[r, c] and (
+                T_array[r, c] > T_array[r, c - 1] or T_array[r, c + 1]
+            ):
+                # if this is a gas cell and it's hotter then the adjacted ones (L or R)
+                # up
+                if (T_array[r, c] > T_array[r - 1, c]) and gas_array[r - 1, c]:
+                    T_array[r - 1, c], T_array[r, c] = T_array[r, c], T_array[r - 1, c]
+                # up-left
+                elif T_array[r, c] > T_array[r - 1, c - 1] and gas_array[r - 1, c - 1]:
+                    T_array[r - 1, c - 1], T_array[r, c] = (
+                        T_array[r, c],
+                        T_array[r - 1, c - 1],
+                    )
+                # up-right
+                elif T_array[r, c] > T_array[r - 1, c + 1] and gas_array[r - 1, c + 1]:
+                    T_array[r - 1, c + 1], T_array[r, c] = (
+                        T_array[r, c],
+                        T_array[r - 1, c + 1],
+                    )
+                # -left
+                elif T_array[r, c] > T_array[r, c - 1] and gas_array[r, c - 1]:
+                    T_array[r, c - 1], T_array[r, c] = T_array[r, c], T_array[r, c - 1]
+                # -right
+                elif T_array[r, c] > T_array[r, c + 1] and gas_array[r, c + 1]:
+                    T_array[r, c + 1], T_array[r, c] = T_array[r, c], T_array[r, c + 1]
+
+
+def open_air_boundary(T_array):
+    rows, cols = T_array.shape
+
+    T_array[0, :] *= 0.25
+    T_array[-1, :] = 0
+    T_array[:, 0] = 0
+    T_array[:, -1] = 0
