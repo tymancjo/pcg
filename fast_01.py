@@ -1,8 +1,6 @@
 import pygame
-import random
 import math
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
 
 
@@ -10,18 +8,18 @@ import pcg_fast as pcg
 
 
 # PCG things
-
 rows = 120
 cols = 35
-
 
 WIDTH = cols * 6
 HEIGHT = rows * 6
 FPS = 500
+BLACK = (0, 0, 0)
 
 pixelCellW = int(WIDTH / cols)
 pixelCellH = int(HEIGHT / rows)
 
+# Defining the world
 theGrid = [
     [
         pcg.Cell(
@@ -36,15 +34,15 @@ theGrid = [
     for y in range(rows)
 ]
 
-MT = np.zeros_like(theGrid) + 1
-print(MT.shape)
 
+# keepers for the solution data for plot
 timeV = []
 maxTV = []
 
-dt = 1 / 1.2
+# initial global conditions
+dt = 1 / 10
 N = 1
-dx = 0.01
+dx = theGrid[0][0].length
 g = 9.81
 s = 0
 
@@ -99,13 +97,6 @@ for r in [A + a, A + a + 5, 16 + A + a, 16 + A + a + 5, 32 + A + a, 32 + A + a +
         bH = 3
 
 
-# Define Colors
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-
 ## initialize pygame and create window
 pygame.init()
 pygame.mixer.init()  ## For sound
@@ -115,21 +106,13 @@ clock = pygame.time.Clock()  ## For syncing the FPS
 font = pygame.font.Font(pygame.font.get_default_font(), 14)
 
 
-## group all the sprites together for ease of update
-# all_sprites = pygame.sprite.Group()
-
 ## Game loop
 running = True
 
-tick = 0
-deltaTick = 5
-makeStep = 0
 sourceActive = False
 editMode = False
 drawing = False
-subSteps = 1
-isGas = pcg.powietrze
-gravity = True
+isGas = True
 reading = 0
 mouseR = mouseC = mouseCol = mouseRow = 0
 simTime = 0
@@ -164,16 +147,21 @@ while running:
                     mouseRow, mouseCol = sourcePos
 
             if event.key == pygame.K_s:
-                isGas = stell
+                isGas = False
 
             if event.key == pygame.K_r:
-                isGas = pcg.powietrze
+                isGas = True
 
             if event.key == pygame.K_h:
 
                 sourceActive = not sourceActive
 
             if event.key == pygame.K_g:
+                if gravity:
+                    g = 0
+                else:
+                    g = 9.81
+
                 gravity = not gravity
 
             if event.key == pygame.K_p:
@@ -207,9 +195,12 @@ while running:
             if drawing:
                 mouseRow, mouseCol = mouseR, mouseC
                 if editMode:
-                    theGrid[mouseRow][mouseCol].material = isGas
-                    theGrid[mouseRow][mouseCol].updateData()
-                    theGrid[mouseRow][mouseCol].update()
+
+                    gas[mouseRow][mouseCol] = isGas
+
+                    # theGrid[mouseRow][mouseCol].material = isGas
+                    # theGrid[mouseRow][mouseCol].updateData()
+                    # theGrid[mouseRow][mouseCol].update()
 
             else:
                 reading = T[mouseR][mouseC]
@@ -223,7 +214,7 @@ while running:
     ### Your code comes here
     # Initializing Color
 
-    currentMax = max(1, T.max())
+    currentMax = T.max()
 
     rows, cols = T.shape
     for r in range(rows):
@@ -319,9 +310,9 @@ while running:
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(0, 60))
 
-    tick += deltaTick
-    if tick > WIDTH - 60 or tick < 0:
-        deltaTick *= -1
+    # tick += deltaTick
+    # if tick > WIDTH - 60 or tick < 0:
+    #     deltaTick *= -1
     ########################
 
     ## Done after drawing everything to the screen
