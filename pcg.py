@@ -23,7 +23,7 @@ class material:
         # default as air
         self.cp = 1.003e3  # J/kg K
         self.ro = 1.29  # kg/m^3
-        self.Sigma = 26e-3  # W/mK
+        self.Sigma = 1 * 26e-3  # W/mK
         self.gas = True
 
 
@@ -88,112 +88,6 @@ def borders(Grid, ht=0.01, hs=0.02, h=0):
         row[-1].update()
 
 
-def segregator(Grid, cols, rows, ht=0.05, g=True):
-    """
-    This procedure manage the main air convection simulation.
-    It is somehow simmilar to cellular automata of a kind.
-
-    it is about transitting temperature to the cells left right and below. And if the temp of the cell is bigger than the average od left bottom and right one - the cell moves up.
-
-    To eliminate the numerical viscocity the rows are analyzed from left to right and from right to left alternativly.
-
-    """
-
-    direction = -1
-    for row, cellRow in enumerate(Grid):
-
-        direction *= -1
-        for col, cell in enumerate(cellRow[::direction]):
-            if direction == -1:
-                col = cols - col - 1
-
-            if cell.gas:
-                # heating cells around
-                if col < cols - 1:
-
-                    cell2 = cellRow[col + 1]
-                    cellR = cell2
-                    dT = cell.T
-                    # dT = cell.T - cell2.T
-                    if dT > 0 and cell2.gas:
-                        cell2.T += ht * dT
-                        cell.T -= ht * dT
-                        cell2.update()
-
-                if col > 0:
-
-                    cell2 = cellRow[col - 1]
-                    cellL = cell2
-                    dT = cell.T
-                    # dT = cell.T - cell2.T
-                    if dT > 0 and cell2.gas:
-                        cell2.T += ht * dT
-                        cell.T -= ht * dT
-                        cell2.update()
-
-                if row < rows - 1:
-
-                    cell2 = Grid[row + 1][col]
-                    cellB = cell2
-                    dT = cell.T
-                    # dT = cell.T - cell2.T
-                    if dT > 0 and cell2.gas:
-                        cell2.T += ht * dT
-                        cell.T -= ht * dT
-                        cell2.update()
-
-                if row > 0:
-
-                    cell2 = Grid[row - 1][col]
-                    cellT = cell2
-                    dT = cell.T
-                    # dT = cell.T - cell2.T
-                    if dT > 0 and cell2.gas:
-                        cell2.T += ht * dT
-                        cell.T -= ht * dT
-                        cell2.update()
-
-                # look up - convection
-                if row > 0 and g:
-                    if cell.T > cellL.T or cell.T > cellR.T:
-                        # if we are hotter than others around
-                        # trying to go up
-                        cellUp = Grid[row - 1][col]
-                        if cell.T > cellUp.T and cellUp.gas:
-                            cell.T, cellUp.T = cellUp.T, cell.T
-                            cellUp.update()
-                        else:
-                            cellUp = Grid[row - 1][min(col + 1, cols - 1)]
-
-                            if cell.T > cellUp.T and cellUp.gas:
-                                cell.T, cellUp.T = cellUp.T, cell.T
-                                cellUp.update()
-
-                            else:
-
-                                cellUp = Grid[row - 1][max(col - 1, 0)]
-
-                                if cell.T > cellUp.T and cellUp.gas:
-                                    cell.T, cellUp.T = cellUp.T, cell.T
-                                    cellUp.update()
-
-                                else:  # no way to move up.
-                                    if cellL.gas:
-                                        cellL.T += ht * 1 * cell.T
-                                        cell.T -= ht * 1 * cell.T
-                                        cellL.update()
-                                    if cellR.gas:
-                                        cellR.T += ht * 1 * cell.T
-                                        cell.T -= ht * 1 * cell.T
-                                        cellR.update()
-
-                                    # if cellB.gas and 0:
-                                    #     cellB.T += ht * 2 * cell.T
-                                    #     cell.T -= ht * 2 * cell.T
-                                    #     cellR.update()
-            cell.update()
-
-
 def heatGeneration(cell, dt=1 / 1000):
     cell.calc(cell.dP * dt)
 
@@ -202,18 +96,20 @@ def heatConduction(cellA, cellB, dt=1 / 1000):
     dT = cellA.T - cellB.T
 
     # Power transferred
-    heatSigma = 1 / (cellA.Rth + cellB.Rth)
+    # if (not cellA.gas) and cellB.gas:
+    #     heatSigma = 1 / (1.0 * cellA.Rth + 1.0 * cellB.Rth)
+    # else:
+    #     heatSigma = 1 / (1.0 * cellA.Rth + 1.0 * cellB.Rth)
+    heatSigma = 1 / (1.0 * cellA.Rth + 1.0 * cellB.Rth)
+
     dP = dT * heatSigma
     dQ = dP * dt
 
     cellA.calc(-dQ)
     cellB.calc(dQ)
 
-    # cellA.update()
-    # cellB.update()
 
-
-def airSim(Grid, arrT, cols, rows, g=True, dt=1e-9, maxT=255, convN=10):
+def airSimCond(Grid, arrT, cols, rows, g=True, dt=1e-9):
     """
     This procedure manage the main air convection simulation.
     It is somehow similar to cellular automata of a kind.
@@ -269,39 +165,62 @@ def airSim(Grid, arrT, cols, rows, g=True, dt=1e-9, maxT=255, convN=10):
                     cellT = cell2
                     heatConduction(cell, cell2, dt=dt)
 
+
+def airSimConv(Grid, arrT, cols, rows, g=True, dt=1e-9, maxT=255):
+    """
+    This procedure manage the main air convection simulation.
+    It is somehow similar to cellular automata of a kind.
+
+    it is about transmitting temperature to the cells left right and below. And if the temp of the cell is bigger than the average od left bottom and right one - the cell moves up.
+
+    To eliminate the numerical viscosity the rows are analyzed from left to right and from right to left alternatively.
+
+    """
+
+    direction = -1
+    for row, cellRow in enumerate(Grid):
+
+        direction *= -1
+        for col, cell in enumerate(cellRow[::direction]):
+            if direction == -1:
+                col = cols - col - 1
+
             if cell.gas:  # if this is a gas cell
                 # the idea to speed up the simulation is to
                 # make 5 time more up moves than the convection ones.
                 # it's for now only as a kind of hacking thing
 
-                for _ in range(convN):
-                    # look up - convection
-                    if row > 0 and g:
-                        if cell.T > cellL.T or cell.T > cellR.T:
-                            # if we are hotter than others around
-                            # trying to go up
-                            cellUp = Grid[row - 1][col]
+                # look up - convection
+                if row > 0 and g and col > 0 and col < cols - 1:
+
+                    cellR = cellRow[col + 1]
+                    cellL = cellRow[col - 1]
+
+                    if cell.T > cellL.T or cell.T > cellR.T:
+                        # if we are hotter than others around
+                        # trying to go up
+                        cellUp = Grid[row - 1][col]
+                        if cell.T > cellUp.T and cellUp.gas:
+                            cell.T, cellUp.T = cellUp.T, cell.T
+                            # cellUp.update(maxT)
+                        else:
+                            cellUp = Grid[row - 1][min(col + 1, cols - 1)]
+
                             if cell.T > cellUp.T and cellUp.gas:
                                 cell.T, cellUp.T = cellUp.T, cell.T
                                 # cellUp.update(maxT)
+
                             else:
-                                cellUp = Grid[row - 1][min(col + 1, cols - 1)]
+
+                                cellUp = Grid[row - 1][max(col - 1, 0)]
 
                                 if cell.T > cellUp.T and cellUp.gas:
                                     cell.T, cellUp.T = cellUp.T, cell.T
                                     # cellUp.update(maxT)
 
-                                else:
-
-                                    cellUp = Grid[row - 1][max(col - 1, 0)]
-
-                                    if cell.T > cellUp.T and cellUp.gas:
-                                        cell.T, cellUp.T = cellUp.T, cell.T
-                                        # cellUp.update(maxT)
-
-                                    else:  # no way to move up.
-                                        heatConduction(cell, cellL, dt=dt)
-                                        heatConduction(cell, cellR, dt=dt)
+                                else:  # no way to move up.
+                                    heatConduction(cell, cellR, dt=dt)
+                                    heatConduction(cell, cellL, dt=dt)
             else:
                 # taking care of the not gas cell.
                 pass

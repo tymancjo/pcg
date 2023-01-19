@@ -11,12 +11,12 @@ import pcg
 
 # PCG things
 
-rows = 100
-cols = 60
+rows = 120
+cols = 35
 
 
-WIDTH = int(800 / cols) * cols
-HEIGHT = int(800 / rows) * rows
+WIDTH = cols * 6
+HEIGHT = rows * 6
 FPS = 500
 
 pixelCellW = int(WIDTH / cols)
@@ -42,8 +42,11 @@ print(MT.shape)
 timeV = []
 maxTV = []
 
-dt = 1 / 2
+dt = 1 / 1.2
 N = 1
+dx = 0.01
+g = 9.81
+s = 0
 
 
 copper = pcg.material()
@@ -55,7 +58,7 @@ copper.ro = 8830  # kg/m3
 stell = pcg.material()
 stell.gas = False
 stell.cp = 0.88e3  # J/kg.K
-stell.Sigma = 55  # W/m.K
+stell.Sigma = 55e-20  # W/m.K
 stell.ro = 8000  # kg/m3
 
 # testing the obstacle made of steel.
@@ -68,9 +71,9 @@ stell.ro = 8000  # kg/m3
 #     cell.updateData()
 
 # testing the source cells made of copper
-A = 10
+A = 40
 a = 20
-B = 25
+B = 15
 startT = 00
 
 bH = 3
@@ -95,38 +98,6 @@ for r in [A + a, A + a + 5, 16 + A + a, 16 + A + a + 5, 32 + A + a, 32 + A + a +
     else:
         bH = 3
 
-loads = []
-
-a = 8
-b = 5.6
-c = 8
-d = 16.5
-e = 13
-f = 16.5
-loads1 = [a, b, c, a, b, c, a, b, c, d, e, f, d, e, f, d, e, f, d, e, f]
-loads.extend(loads1)
-
-a = 14.7
-b = 9.7
-c = 14.7
-d = 16.5
-e = 14
-f = 16.5
-loads1 = [a, b, c, a, b, c, a, b, c, d, e, f, d, e, f, d, e, f, d, e, f]
-loads.extend(loads1)
-
-a = 21.3
-b = 15
-c = 21.3
-d = 7.7
-e = 5.75
-f = 7.7
-loads1 = [a, b, c, a, b, c, a, b, c, d, e, f, d, e, f, d, e, f, d, e, f]
-loads.extend(loads1)
-
-for n, cell in enumerate(srcCells):
-    cell.dP = loads[n]
-
 
 # Define Colors
 WHITE = (255, 255, 255)
@@ -141,7 +112,7 @@ pygame.mixer.init()  ## For sound
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Particle Cell Grid")
 clock = pygame.time.Clock()  ## For syncing the FPS
-font = pygame.font.Font(pygame.font.get_default_font(), 20)
+font = pygame.font.Font(pygame.font.get_default_font(), 14)
 
 
 ## group all the sprites together for ease of update
@@ -160,8 +131,10 @@ subSteps = 1
 isGas = pcg.powietrze
 gravity = True
 reading = 0
-mouseR = mouseC = 0
+mouseR = mouseC = mouseCol = mouseRow = 0
 simTime = 0
+realstart_time = nowIs = pygame.time.get_ticks()
+
 # cell = pcg.Cell()
 # cell.T = 100
 # cell.update()
@@ -265,43 +238,76 @@ while running:
                     pygame.Rect(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2),
                 )
 
-    # if makeStep > 1:
     if not editMode:
-        for _ in range(subSteps):
 
+        # if makeStep > N or simTime == 0:
+        if True:
             currentMax = MT.max()
-
             pcg.airSimCond(theGrid, MT, cols, rows, g=gravity, dt=dt)
+            pcg.borders(theGrid, hs=0.9, ht=1.0, h=0)
 
-            for _ in range(N):
-                pcg.airSimConv(
-                    theGrid, MT, cols, rows, g=gravity, dt=dt, maxT=currentMax
-                )
-
-            pcg.borders(theGrid, hs=0.9, ht=0.5, h=0)
-
-            if sourceActive:
-                theGrid[mouseRow][mouseCol].T += 100
-                theGrid[mouseRow][mouseCol].update()
-
-            reading = theGrid[mouseR][mouseC].T
+            makeStep = 0
             simTime += dt
 
-            simH = math.floor(simTime / 3600)
-            simMin = math.floor((simTime - simH * 3600) / 60)
-            simSec = math.floor(simTime - simH * 3600 - simMin * 60)
+            frameTime = (pygame.time.get_ticks() - nowIs) / 1000
 
-            text_string = f"dT:{reading:.4f} / maxT: {currentMax:.4f} K time: {simH:02d}:{simMin:02d}:{simSec:02d}".encode()
-            text_surface = font.render(text_string, True, (0, 0, 0))
-            screen.blit(text_surface, dest=(0, 0))
+            nowIs = pygame.time.get_ticks()
+
+            frameRatio = dt / frameTime
+
+            realTime = (nowIs - realstart_time) / 1000
+            timeRatio = simTime / realTime
 
             timeV.append(simTime)
             maxTV.append(currentMax)
 
+            s = g * (((currentMax + 35) / 35) - 1) * dt * dt
+            N = math.floor(s / dx) + 1
+
+            maxNup = 5
+            if N > maxNup:
+                dt = dt * maxNup / N
+                s = g * (((currentMax + 35) / 35) - 1) * dt * dt
+                N = math.floor(s / dx)
+
+            # if sourceActive:
+            #     theGrid[mouseRow][mouseCol].T += 100
+            #     theGrid[mouseRow][mouseCol].update()
+
+        for _ in range(N):
+            pcg.airSimConv(theGrid, MT, cols, rows, g=gravity, dt=dt, maxT=currentMax)
+
+        # reading = theGrid[mouseRow][mouseCol].T
+        reading = MT[mouseRow][mouseCol]
+
+        makeStep += 1
+
     else:
         pygame.draw.rect(screen, (255, 0, 0), pygame.Rect(0, 0, 20, 20))
 
-    makeStep += 1
+    simH = math.floor(simTime / 3600)
+    simMin = math.floor((simTime - simH * 3600) / 60)
+    simSec = math.floor(simTime - simH * 3600 - simMin * 60)
+
+    text_string = f"dT:{reading:.4f}K".encode()
+    text_surface = font.render(text_string, True, (255, 255, 255))
+    screen.blit(text_surface, dest=(0, 0))
+
+    text_string = f"maxT: {currentMax:.4f}K".encode()
+    text_surface = font.render(text_string, True, (255, 255, 255))
+    screen.blit(text_surface, dest=(0, 15))
+
+    text_string = f"time: {simH:02d}:{simMin:02d}:{simSec:02d}".encode()
+    text_surface = font.render(text_string, True, (255, 255, 255))
+    screen.blit(text_surface, dest=(0, 30))
+
+    text_string = f"s: {1000*s:.2f}mm / {N}".encode()
+    text_surface = font.render(text_string, True, (255, 255, 255))
+    screen.blit(text_surface, dest=(0, 45))
+
+    text_string = f"S/R: {timeRatio:.3f} / Fr{frameRatio:.2f}".encode()
+    text_surface = font.render(text_string, True, (255, 255, 255))
+    screen.blit(text_surface, dest=(0, 60))
 
     tick += deltaTick
     if tick > WIDTH - 60 or tick < 0:
