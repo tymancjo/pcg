@@ -6,17 +6,33 @@ from numba import njit
 
 
 class dataKeeper:
-    def __init__(
-        self, grid, width, height, rows, cols, sourceActive, mouseRow, mouseCol
-    ):
-        self.grid = grid
-        self.width = width
-        self.height = height
-        self.rows = rows
-        self.cols = cols
-        self.sourceActive = sourceActive
-        self.mouseRow = mouseRow
-        self.mouseCol = mouseCol
+    def __init__(self, dataList):
+        self.data = dataList
+
+    def get_data(self):
+        return self.data
+
+
+def save_data(obj):
+    filename = input("Filename: ")
+    try:
+        filehandler = open(filename, "wb")
+    except:
+        return False
+
+    pickle.dump(obj, filehandler)
+    return True
+
+
+def load_data():
+    filename = input("Filename: ")
+    try:
+        filehandler = open(filename, "rb")
+    except:
+        return False
+
+    obj = pickle.load(filehandler)
+    return obj
 
 
 class material:

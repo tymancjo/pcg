@@ -35,10 +35,6 @@ theGrid = [
 ]
 
 
-# keepers for the solution data for plot
-timeV = []
-maxTV = []
-
 # initial global conditions
 dt = 1 / 10
 N = 1
@@ -118,10 +114,21 @@ mouseR = mouseC = mouseCol = mouseRow = 0
 simTime = 0
 realstart_time = nowIs = pygame.time.get_ticks()
 
-### Array based solution thing
-# pre processor to prepare the arrays
-T, dP, Rth, massCp, gas = pcg.pre_processor(theGrid)
-print(f"Array shape: {T.shape}")
+
+q = input("Load any data? ")
+if any(c in ["y", "Y", "t", "T"] for c in q):
+    dane = pcg.load_data()
+    if dane:
+        T, dP, Rth, massCp, gas, dt, g, timeV, maxTV = dane.get_data()
+        simTime = timeV[-1]
+else:
+    ### Array based solution thing
+    # pre processor to prepare the arrays
+    T, dP, Rth, massCp, gas = pcg.pre_processor(theGrid)
+    print(f"Array shape: {T.shape}")
+    # keepers for the solution data for plot
+    timeV = []
+    maxTV = []
 
 
 while running:
@@ -157,17 +164,32 @@ while running:
                 sourceActive = not sourceActive
 
             if event.key == pygame.K_g:
-                if gravity:
+                if g:
                     g = 0
                 else:
                     g = 9.81
-
-                gravity = not gravity
 
             if event.key == pygame.K_p:
                 if editMode:
                     plt.plot(timeV, maxTV)
                     plt.show()
+
+            if event.key == pygame.K_w:
+                if editMode:
+                    dane = pcg.dataKeeper(
+                        [T, dP, Rth, massCp, gas, dt, g, timeV, maxTV]
+                    )
+                    if pcg.save_data(dane):
+                        print("Save successful!")
+                    else:
+                        print("Issue with making save!")
+
+            if event.key == pygame.K_l:
+                if editMode:
+                    dane = pcg.load_data()
+                    if dane:
+                        T, dP, Rth, massCp, gas, dt, g, timeV, maxTV = dane.get_data()
+                        simTime = timeV[-1]
 
         # handle MOUSEBUTTONUP
         if event.type == pygame.MOUSEBUTTONDOWN:
