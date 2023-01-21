@@ -181,7 +181,7 @@ makeStep = 100
 frameRatioV = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 showPlot = True
 plotSteps = 0
-selected_material = 0
+selected_material = 1
 
 # q = input("Load any data? ")
 q = ""
@@ -472,10 +472,9 @@ while running:
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(navi_left, 60))
 
-    # tick += deltaTick
-    # if tick > WIDTH - 60 or tick < 0:
-    #     deltaTick *= -1
-    ########################
+    text_string = f"Wybrano: {m_name[selected_material]}".encode()
+    text_surface = font.render(text_string, True, (255, 255, 255))
+    screen.blit(text_surface, dest=(navi_left, 100))
 
     ## Done after drawing everything to the screen
     pygame.display.flip()
