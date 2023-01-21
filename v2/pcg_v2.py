@@ -130,9 +130,9 @@ def pre_processor(the_grid):
             T_array[r, c] = cell.T
             dP_array[r, c] = cell.dP
             material_ID[r, c] = int(cell.ID)
-            gas_array[r, c] = cell.gas
+            # gas_array[r, c] = cell.gas
 
-    return T_array, dP_array, material_ID.astype(int), gas_array
+    return T_array, dP_array, material_ID.astype(int)  # , gas_array
 
 
 @njit
@@ -191,36 +191,42 @@ def solve_cond(T_array, dP_array, m_ID, massCp_array, Rth_array, dt=1 / 100):
 
 
 @njit
-def solve_conv(T_array, gas_array, dt=1 / 100):
+def solve_conv(T_array, m_ID, gas_array, dt=1 / 100):
 
     rows, cols = T_array.shape
 
     for r in range(1, rows - 1):
         for c in range(1, cols - 1):
-            if gas_array[r, c] and (
+            if gas_array[m_ID[r, c]] and (
                 T_array[r, c] > T_array[r, c - 1] or T_array[r, c + 1]
             ):
                 # if this is a gas cell and it's hotter then the adjacted ones (L or R)
                 # up
-                if (T_array[r, c] > T_array[r - 1, c]) and gas_array[r - 1, c]:
+                if (T_array[r, c] > T_array[r - 1, c]) and gas_array[m_ID[r - 1, c]]:
                     T_array[r - 1, c], T_array[r, c] = T_array[r, c], T_array[r - 1, c]
                 # up-left
-                elif T_array[r, c] > T_array[r - 1, c - 1] and gas_array[r - 1, c - 1]:
+                elif (
+                    T_array[r, c] > T_array[r - 1, c - 1]
+                    and gas_array[m_ID[r - 1, c - 1]]
+                ):
                     T_array[r - 1, c - 1], T_array[r, c] = (
                         T_array[r, c],
                         T_array[r - 1, c - 1],
                     )
                 # up-right
-                elif T_array[r, c] > T_array[r - 1, c + 1] and gas_array[r - 1, c + 1]:
+                elif (
+                    T_array[r, c] > T_array[r - 1, c + 1]
+                    and gas_array[m_ID[r - 1, c + 1]]
+                ):
                     T_array[r - 1, c + 1], T_array[r, c] = (
                         T_array[r, c],
                         T_array[r - 1, c + 1],
                     )
                 # -left
-                elif T_array[r, c] > T_array[r, c - 1] and gas_array[r, c - 1]:
+                elif T_array[r, c] > T_array[r, c - 1] and gas_array[m_ID[r, c - 1]]:
                     T_array[r, c - 1], T_array[r, c] = T_array[r, c], T_array[r, c - 1]
                 # -right
-                elif T_array[r, c] > T_array[r, c + 1] and gas_array[r, c + 1]:
+                elif T_array[r, c] > T_array[r, c + 1] and gas_array[m_ID[r, c + 1]]:
                     T_array[r, c + 1], T_array[r, c] = T_array[r, c], T_array[r, c + 1]
 
 

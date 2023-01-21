@@ -91,73 +91,6 @@ m_colors = [(255, 255, 255), (5, 5, 55), (130, 130, 5)]
 ##########################
 
 
-# testing the obstacle made of steel.
-# for cell in theGrid[5][15:35]:
-#     cell.material = stell
-#     # cell.gas = false
-#     # cell.cp = 0.88e3  # j/kg.k
-#     # cell.sigma = 55  # w/m.k
-#     # cell.ro = 8000  # kg/m3
-#     cell.updateData()
-
-# testing the source cells made of copper
-A = 50
-a = 20
-B = 40
-startT = 00
-
-bH = 3
-
-srcCells = []
-
-for r in [A + a, A + a + 5, 16 + A + a, 16 + A + a + 5, 32 + A + a, 32 + A + a + 5]:
-    # for r in [A + 20, A + 30, A + 40]:
-    for row in theGrid[r : r + bH]:
-        for cell in row[B : B + 5 : 2]:
-            cell.dP = 10  # W
-            cell.material = copper
-            cell.ID = copper.ID
-            cell.T = startT
-            cell.updateData()
-            srcCells.append(cell)
-    if bH == 3:
-        bH = 4
-    else:
-        bH = 3
-
-loads = []
-
-a = 8
-b = 5.6
-c = 8
-d = 16.5
-e = 13
-f = 16.5
-loads1 = [a, b, c, a, b, c, a, b, c, d, e, f, d, e, f, d, e, f, d, e, f]
-loads.extend(loads1)
-
-a = 14.7
-b = 9.7
-c = 14.7
-d = 16.5
-e = 14
-f = 16.5
-loads1 = [a, b, c, a, b, c, a, b, c, d, e, f, d, e, f, d, e, f, d, e, f]
-loads.extend(loads1)
-
-a = 21.3
-b = 15
-c = 21.3
-d = 7.7
-e = 5.75
-f = 7.7
-loads1 = [a, b, c, a, b, c, a, b, c, d, e, f, d, e, f, d, e, f, d, e, f]
-loads.extend(loads1)
-
-for n, cell in enumerate(srcCells):
-    cell.dP = loads[n]
-
-
 ## initialize pygame and create window
 pygame.init()
 pygame.mixer.init()  ## For sound
@@ -439,7 +372,11 @@ while running:
             # the number of points:
             plot_dt = max(1, math.floor(len(maxTV) / (navi_size - 20)))
             plot_height = 150  # px
-            plot_scale = plot_height / (max(maxTV) - min(maxTV))
+            if max(maxTV) > 0:
+                plot_scale = plot_height / (max(maxTV) - min(maxTV))
+            else:
+                plot_scale = 0
+
             plot_y = HEIGHT - 10
 
             pygame.draw.line(

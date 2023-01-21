@@ -21,25 +21,27 @@ This might work further, just let's make it in the material definitions database
 it will be made of:
 - **Rth** array
 - **massCp** array 
+- **gas** array
 
 the logic will be:
 Solver check the ctn = CellTypeNumber and gets the required values from the arrays:
 - **Rth[ctn]** 
 - **massCp[ctn]**
+- **gas[ctn]**
 TODO:
     - Fix save and load
-    - 
+    - [x] Edit mode using material ID
 
 ## World Editor concept
 It's about more user friendly way of editing the simulation domain. 
 To do plan:
-- [ ] Side panel with buttons
+- [x] Side panel with buttons
     - [ ] Run/Pause
     - [ ] Save
     - [ ] Load
     - [ ] Edit Mode Toggle
 - [ ] In edit mode:
-    - [ ] Cell type selection 
+    - [x] Cell type selection 
     - [ ] Shape drawing
         - [ ] Lines
         - [ ] Boxes
