@@ -26,6 +26,9 @@ the logic will be:
 Solver check the ctn = CellTypeNumber and gets the required values from the arrays:
 - **Rth[ctn]** 
 - **massCp[ctn]**
+TODO:
+    - Fix save and load
+    - 
 
 ## World Editor concept
 It's about more user friendly way of editing the simulation domain. 
@@ -37,4 +40,12 @@ To do plan:
     - [ ] Edit Mode Toggle
 - [ ] In edit mode:
     - [ ] Cell type selection 
-    - [ ] Line drawing
+    - [ ] Shape drawing
+        - [ ] Lines
+        - [ ] Boxes
+        - [ ] Circles 
+    - [ ] Source definition
+        - [ ] Set temperature
+        - [ ] Set power generation
+
+
