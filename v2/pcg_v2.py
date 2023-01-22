@@ -202,12 +202,12 @@ def solve_conv(T_array, m_ID, gas_array, dt=1 / 100):
             ):
                 # if this is a gas cell and it's hotter then the adjacted ones (L or R)
                 # up
-                if (T_array[r, c] > T_array[r - 1, c]) and gas_array[m_ID[r - 1, c]]:
+                if (T_array[r, c] > T_array[r - 1, c]) and m_ID[r, c] == m_ID[r - 1, c]:
                     T_array[r - 1, c], T_array[r, c] = T_array[r, c], T_array[r - 1, c]
                 # up-left
                 elif (
                     T_array[r, c] > T_array[r - 1, c - 1]
-                    and gas_array[m_ID[r - 1, c - 1]]
+                    and m_ID[r, c] == m_ID[r - 1, c - 1]
                 ):
                     T_array[r - 1, c - 1], T_array[r, c] = (
                         T_array[r, c],
@@ -216,17 +216,17 @@ def solve_conv(T_array, m_ID, gas_array, dt=1 / 100):
                 # up-right
                 elif (
                     T_array[r, c] > T_array[r - 1, c + 1]
-                    and gas_array[m_ID[r - 1, c + 1]]
+                    and m_ID[r, c] == m_ID[r - 1, c + 1]
                 ):
                     T_array[r - 1, c + 1], T_array[r, c] = (
                         T_array[r, c],
                         T_array[r - 1, c + 1],
                     )
                 # -left
-                elif T_array[r, c] > T_array[r, c - 1] and gas_array[m_ID[r, c - 1]]:
+                elif T_array[r, c] > T_array[r, c - 1] and m_ID[r, c] == m_ID[r, c - 1]:
                     T_array[r, c - 1], T_array[r, c] = T_array[r, c], T_array[r, c - 1]
                 # -right
-                elif T_array[r, c] > T_array[r, c + 1] and gas_array[m_ID[r, c + 1]]:
+                elif T_array[r, c] > T_array[r, c + 1] and m_ID[r, c] == m_ID[r, c + 1]:
                     T_array[r, c + 1], T_array[r, c] = T_array[r, c], T_array[r, c + 1]
 
 

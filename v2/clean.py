@@ -52,13 +52,19 @@ g = 9.81
 s = 0
 
 
+water = pcg.material()
+water.gas = True
+water.cp = 4.186e3  # J/kg.K
+water.Sigma = 600e-3  # W/m.K
+water.ro = 997  # kg/m3
+water.ID = 3
+
 copper = pcg.material()
 copper.gas = False
 copper.cp = 385  # J/kg.K
 copper.Sigma = 400e-0  # W/m.K
 copper.ro = 8830  # kg/m3
 copper.ID = 2
-
 
 stell = pcg.material()
 stell.gas = False
@@ -78,16 +84,23 @@ copperCell.material = copper
 copperCell.ID = 2
 copperCell.updateData()
 
+waterCell = pcg.Cell()
+waterCell.material = water
+waterCell.ID = 3
+waterCell.updateData()
+
 airCell = pcg.Cell()
 airCell.ID = 0
 
 ##########################
 # Material database idea #
-m_name = ["Air", "Steel", "Copper"]
-m_Rth = np.array([airCell.Rth, steelCell.Rth, copperCell.Rth])
-m_massCp = np.array([airCell.massCp, steelCell.massCp, copperCell.massCp])
-m_gas = np.array([airCell.gas, steelCell.gas, copperCell.gas])
-m_colors = [(255, 255, 255), (5, 5, 55), (130, 130, 5)]
+m_name = ["Air", "Steel", "Copper", "Water"]
+m_Rth = np.array([airCell.Rth, steelCell.Rth, copperCell.Rth, waterCell.Rth])
+m_massCp = np.array(
+    [airCell.massCp, steelCell.massCp, copperCell.massCp, waterCell.massCp]
+)
+m_gas = np.array([airCell.gas, steelCell.gas, copperCell.gas, waterCell.gas])
+m_colors = [(255, 255, 255), (5, 5, 55), (130, 130, 5), (30, 30, 255)]
 ##########################
 
 
@@ -119,6 +132,7 @@ showPlot = True
 plotSteps = 0
 selected_material = 1
 selectedCells = []
+dKeyCount = 0
 
 # q = input("Load any data? ")
 q = ""
@@ -237,11 +251,57 @@ while running:
                             ),
                         ] = 2
 
+            if event.key == pygame.K_4:
+                if editMode:
+                    selected_material = 2
+                    if drawMode == 1:
+                        m_ID[
+                            min(selectedCells[1], selectedCells[3]) : max(
+                                selectedCells[1], selectedCells[3]
+                            ),
+                            min(selectedCells[0], selectedCells[2]) : max(
+                                selectedCells[0], selectedCells[2]
+                            ),
+                        ] = 3
+
+            if event.key == pygame.K_9:
+                if editMode:
+                    if drawMode == 1:
+                        dP[
+                            min(selectedCells[1], selectedCells[3]) : max(
+                                selectedCells[1], selectedCells[3]
+                            ),
+                            min(selectedCells[0], selectedCells[2]) : max(
+                                selectedCells[0], selectedCells[2]
+                            ),
+                        ] += 10
+
+            if event.key == pygame.K_0:
+                if editMode:
+                    if drawMode == 1:
+                        dP[
+                            min(selectedCells[1], selectedCells[3]) : max(
+                                selectedCells[1], selectedCells[3]
+                            ),
+                            min(selectedCells[0], selectedCells[2]) : max(
+                                selectedCells[0], selectedCells[2]
+                            ),
+                        ] = 0
+
+            if event.key == pygame.K_q:
+                if editMode:
+                    dKeyCount += 1
+                    if dKeyCount > 3:
+                        dKeyCount = 0
+                        timeV = [0]
+                        maxTV = [0]
+                        T[:, :] = 0.0
+
             if event.key == pygame.K_d:
                 if editMode:
-                    if "y" in input("y-to confirm "):
-                        timeV = []
-                        maxTV = []
+                    drawMode += 1
+                    if drawMode > 1:
+                        drawMode = 0
 
         # handle MOUSEBUTTONUP
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -266,7 +326,7 @@ while running:
                     if editMode:
                         if drawMode == 0:
                             # just setting the given cell to a material
-                            m_ID[mouseRow][mouseCol] = selected_material
+                            m_ID[mouseR][mouseC] = selected_material
                         elif drawMode == 1:
                             # drawing the rectangle
                             pass
@@ -278,7 +338,8 @@ while running:
             pos = pygame.mouse.get_pos()
             if pos[0] < navi_start:
                 drawing = False
-                selectedCells = [mouseCol, mouseRow, mouseC, mouseR]
+                if drawMode > 0:
+                    selectedCells = [mouseCol, mouseRow, mouseC, mouseR]
 
     # 3Draw/render step count - to not draw each calculation step
     makeStep += 1
@@ -338,7 +399,7 @@ while running:
                             (POS[0], POS[1]),
                             (POS[2], POS[3]),
                         )
-            elif selectedCells:
+            elif selectedCells and drawMode == 1:
                 # rectangle stuff
                 Xs = selectedCells[0] * pixelCellW
                 Ys = selectedCells[1] * pixelCellH
@@ -392,27 +453,30 @@ while running:
             maxTV.append(currentMax)
 
             s = g * (((currentMax + 35) / 35) - 1) * dt * dt
-            N = math.floor(s / dx) + 1
-            N = max(2, N)
-
-            if N > maxNup:
-                dt = dt * maxNup / N
-                s = g * (((currentMax + 35) / 35) - 1) * dt * dt
+            if s > dx / 2:
                 N = math.floor(s / dx) + 1
-            if N < maxNup and simTime > 30:
-                dt = dt * maxNup / N
-                s = g * (((currentMax + 35) / 35) - 1) * dt * dt
-                N = math.floor(s / dx) + 1
+                N = max(2, N)
 
-            N = max(2, N)
-            if dt < 1 / 50_000:
-                dt = 1 / 1000
+                if N > maxNup:
+                    dt = dt * maxNup / N
+                    s = g * (((currentMax + 35) / 35) - 1) * dt * dt
+                    N = math.floor(s / dx) + 1
+                if N < maxNup and simTime > 30:
+                    dt = dt * maxNup / N
+                    s = g * (((currentMax + 35) / 35) - 1) * dt * dt
+                    N = math.floor(s / dx) + 1
 
-        for _ in range(N):
-            pcg.solve_conv(T, m_ID, m_gas, dt)
+                N = max(2, N)
+                if dt < 1 / 50_000:
+                    dt = 1 / 1000
+
+        if s > 0:
+            for _ in range(N):
+                pcg.solve_conv(T, m_ID, m_gas, dt)
 
         reading = T[mouseRow][mouseCol]
         material = m_name[m_ID[mouseRow][mouseCol]]
+        powerloss = dP[mouseRow][mouseCol]
 
         # pygame.draw.rect(screen, (0, 255, 0), pygame.Rect(navi_start, 0, 10, 10))
     else:
@@ -470,7 +534,7 @@ while running:
     simMin = math.floor((simTime - simH * 3600) / 60)
     simSec = math.floor(simTime - simH * 3600 - simMin * 60)
 
-    text_string = f"{material} dT:{reading:.2f}K".encode()
+    text_string = f"{material} dT:{reading:.2f}K dP:{powerloss:.1f}W".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(navi_left, 0))
 
@@ -490,9 +554,19 @@ while running:
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(navi_left, 60))
 
-    text_string = f"Wybrano: {m_name[selected_material]}".encode()
+    text_string = f"Selected: {m_name[selected_material]}".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(navi_left, 100))
+
+    if editMode:
+        text_string = f"Selecton: {abs(mouseCol - mouseC)}x{abs(mouseRow-mouseR)} @ Dm: {drawMode}".encode()
+        text_surface = font.render(text_string, True, (255, 255, 255))
+        screen.blit(text_surface, dest=(navi_left, 120))
+
+    for i, mat in enumerate(m_name):
+        text_string = f"{i+1}: {mat}".encode()
+        text_surface = font.render(text_string, True, (255, 255, 255))
+        screen.blit(text_surface, dest=(navi_left, 140 + 15 * i))
 
     ## Done after drawing everything to the screen
     pygame.display.flip()
