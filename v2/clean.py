@@ -109,6 +109,7 @@ drawing = False
 isGas = True
 reading = 0
 mouseR = mouseC = mouseCol = mouseRow = 0
+drawMode = 1
 simTime = 0
 realstart_time = nowIs = pygame.time.get_ticks()
 maxNup = 6
@@ -117,6 +118,7 @@ frameRatioV = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 showPlot = True
 plotSteps = 0
 selected_material = 1
+selectedCells = []
 
 # q = input("Load any data? ")
 q = ""
@@ -195,18 +197,45 @@ while running:
             if event.key == pygame.K_1:
                 if editMode:
                     selected_material = 0
+                    if drawMode == 1:
+                        m_ID[
+                            min(selectedCells[1], selectedCells[3]) : max(
+                                selectedCells[1], selectedCells[3]
+                            ),
+                            min(selectedCells[0], selectedCells[2]) : max(
+                                selectedCells[0], selectedCells[2]
+                            ),
+                        ] = 0
                 else:
                     maxNup = max(3, maxNup - 1)
 
             if event.key == pygame.K_2:
                 if editMode:
                     selected_material = 1
+                    if drawMode == 1:
+                        m_ID[
+                            min(selectedCells[1], selectedCells[3]) : max(
+                                selectedCells[1], selectedCells[3]
+                            ),
+                            min(selectedCells[0], selectedCells[2]) : max(
+                                selectedCells[0], selectedCells[2]
+                            ),
+                        ] = 1
                 else:
                     maxNup = min(500, maxNup + 1)
 
             if event.key == pygame.K_3:
                 if editMode:
                     selected_material = 2
+                    if drawMode == 1:
+                        m_ID[
+                            min(selectedCells[1], selectedCells[3]) : max(
+                                selectedCells[1], selectedCells[3]
+                            ),
+                            min(selectedCells[0], selectedCells[2]) : max(
+                                selectedCells[0], selectedCells[2]
+                            ),
+                        ] = 2
 
             if event.key == pygame.K_d:
                 if editMode:
@@ -222,7 +251,6 @@ while running:
             if pos[0] < navi_start:
                 mouseRow = math.floor(pos[1] / pixelCellH)
                 mouseCol = math.floor(pos[0] / pixelCellW)
-
                 drawing = True
 
         if event.type == pygame.MOUSEMOTION:
@@ -234,17 +262,14 @@ while running:
                 mouseC = math.floor(pos[0] / pixelCellW)
 
                 if drawing:
-                    mouseRow, mouseCol = mouseR, mouseC
+                    # mouseRow, mouseCol = mouseR, mouseC
                     if editMode:
-                        m_ID[mouseRow][mouseCol] = selected_material
-
-                        # gas[mouseRow][mouseCol] = isGas
-                        # if isGas:
-                        #     Rth[mouseRow][mouseCol] = airCell.Rth
-                        #     massCp[mouseRow][mouseCol] = airCell.massCp
-                        # else:
-                        #     Rth[mouseRow][mouseCol] = steelCell.Rth
-                        #     massCp[mouseRow][mouseCol] = steelCell.massCp
+                        if drawMode == 0:
+                            # just setting the given cell to a material
+                            m_ID[mouseRow][mouseCol] = selected_material
+                        elif drawMode == 1:
+                            # drawing the rectangle
+                            pass
 
                 else:
                     reading = T[mouseR][mouseC]
@@ -253,6 +278,7 @@ while running:
             pos = pygame.mouse.get_pos()
             if pos[0] < navi_start:
                 drawing = False
+                selectedCells = [mouseCol, mouseRow, mouseC, mouseR]
 
     # 3Draw/render step count - to not draw each calculation step
     makeStep += 1
@@ -288,6 +314,48 @@ while running:
                         pygame.Rect(
                             pos_x + 1, pos_y + 1, pixelCellW - 2, pixelCellH - 2
                         ),
+                    )
+
+        if editMode:
+            if drawing:
+                # taking care of the edit drawings
+                if drawMode == 1:
+                    # rectangle stuff
+                    Xs = mouseCol * pixelCellW
+                    Ys = mouseRow * pixelCellH
+                    Xe = mouseC * pixelCellW
+                    Ye = mouseR * pixelCellH
+
+                    for POS in [
+                        (Xs, Ys, Xe, Ys),
+                        (Xe, Ys, Xe, Ye),
+                        (Xe, Ye, Xs, Ye),
+                        (Xs, Ye, Xs, Ys),
+                    ]:
+                        pygame.draw.line(
+                            screen,
+                            (255, 25, 25),
+                            (POS[0], POS[1]),
+                            (POS[2], POS[3]),
+                        )
+            elif selectedCells:
+                # rectangle stuff
+                Xs = selectedCells[0] * pixelCellW
+                Ys = selectedCells[1] * pixelCellH
+                Xe = selectedCells[2] * pixelCellW
+                Ye = selectedCells[3] * pixelCellH
+
+                for POS in [
+                    (Xs, Ys, Xe, Ys),
+                    (Xe, Ys, Xe, Ye),
+                    (Xe, Ye, Xs, Ye),
+                    (Xs, Ye, Xs, Ys),
+                ]:
+                    pygame.draw.line(
+                        screen,
+                        (255, 255, 255),
+                        (POS[0], POS[1]),
+                        (POS[2], POS[3]),
                     )
 
     if not editMode:
@@ -351,7 +419,7 @@ while running:
         pass
         # pygame.draw.rect(screen, (255, 0, 0), pygame.Rect(navi_start, 0, 10, 10))
 
-    # Navi pane bck
+    # Navi pane
     color = (25, 75, 25)
     if editMode:
         color = (75, 25, 25)
@@ -429,7 +497,7 @@ while running:
     ## Done after drawing everything to the screen
     pygame.display.flip()
 
-plt.plot(timeV, maxTV)
-plt.show()
+# plt.plot(timeV, maxTV)
+# plt.show()
 
 pygame.quit()
