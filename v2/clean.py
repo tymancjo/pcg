@@ -4,31 +4,43 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import pcg_v2 as pcg
+import materials as mt
 
 
-# PCG things
+# material database for the solver
+# define the materials needed by making a list
+materials = [mt.airCell, mt.steelCell, mt.copperCell, mt.waterCell]
+
+# generating required arrays ###########################
+m_name = [c.name for c in materials]
+m_Rth = np.array([c.Rth for c in materials])
+m_massCp = np.array([c.massCp for c in materials])
+m_gas = np.array([c.gas for c in materials])
+m_colors = [c.color for c in materials]
+# ######################################################
+
+# Simulation grid size definition
 rows = 200
 cols = 60
 
-
-WIDTH = cols * 6
-HEIGHT = rows * 6
+# display and pixel data
+pixelSize = int(min(1000 / cols, 1000 / rows))
+WIDTH = cols * pixelSize
+HEIGHT = rows * pixelSize
 FPS = 500
 BLACK = (0, 0, 0)
 
 pixelCellW = int(WIDTH / cols)
 pixelCellH = int(HEIGHT / rows)
 
-
 # some handy data fo the navi panel
 # Navi pane size
 navi_size = 200  # px
-
 navi_start = WIDTH
 navi_left = navi_start + 10
 WIDTH += navi_size
 
-# Defining the world grid
+# Defining the world grid ###############
 theGrid = [
     [
         pcg.Cell(
@@ -42,66 +54,44 @@ theGrid = [
     ]
     for y in range(rows)
 ]
+# ########################################
+# pre processor to prepare the arrays
+T, dP, m_ID = pcg.pre_processor(theGrid)
 
 
-# initial global conditions
+# initial global conditions ##############
 dt = 1 / 10
 N = 6
 dx = theGrid[0][0].length
 g = 9.81
 s = 0
+# keepers for the solution data for plot
+timeV = [0]
+maxTV = [0]
 
+# needed global values ##############################
+editMode = True  # we start in stopped mode
+drawing = False  # for the track of edit behavior
+drawMode = 1
+viewMode = 0
+stepsToDraw = 10
+simTime = 0
+maxNup = 6
+makeStep = 100
+frameRatioV = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+frameRatio = 0
+showPlot = True
+plotSteps = 0
+selected_material = 1
+selectedCells = []
+mouseR = mouseC = mouseCol = mouseRow = 0
+dKeyCount = 0  # used to count "Q" presses for reset
+nowIs = 0
 
-water = pcg.material()
-water.gas = True
-water.cp = 4.186e3  # J/kg.K
-water.Sigma = 600e-3  # W/m.K
-water.ro = 997  # kg/m3
-water.ID = 3
-
-copper = pcg.material()
-copper.gas = False
-copper.cp = 385  # J/kg.K
-copper.Sigma = 400e-0  # W/m.K
-copper.ro = 8830  # kg/m3
-copper.ID = 2
-
-stell = pcg.material()
-stell.gas = False
-stell.cp = 0.88e3  # J/kg.K
-stell.Sigma = 55  # W/m.K
-stell.ro = 8000  # kg/m3
-stell.ID = 1
-
-steelCell = pcg.Cell()
-steelCell.material = stell
-steelCell.length = 2e-3
-steelCell.ID = 1
-steelCell.updateData()
-
-copperCell = pcg.Cell()
-copperCell.material = copper
-copperCell.ID = 2
-copperCell.updateData()
-
-waterCell = pcg.Cell()
-waterCell.material = water
-waterCell.ID = 3
-waterCell.updateData()
-
-airCell = pcg.Cell()
-airCell.ID = 0
-
-##########################
-# Material database idea #
-m_name = ["Air", "Steel", "Copper", "Water"]
-m_Rth = np.array([airCell.Rth, steelCell.Rth, copperCell.Rth, waterCell.Rth])
-m_massCp = np.array(
-    [airCell.massCp, steelCell.massCp, copperCell.massCp, waterCell.massCp]
-)
-m_gas = np.array([airCell.gas, steelCell.gas, copperCell.gas, waterCell.gas])
-m_colors = [(255, 255, 255), (5, 5, 55), (130, 130, 5), (30, 30, 255)]
-##########################
+# initial text to put on screen
+reading = 0
+powerloss = 0
+material = m_name[selected_material]
 
 
 ## initialize pygame and create window
@@ -113,47 +103,8 @@ clock = pygame.time.Clock()  ## For syncing the FPS
 font = pygame.font.Font(pygame.font.get_default_font(), 12)
 
 
-## Game loop
+## Simulation animation main loop
 running = True
-
-sourceActive = False
-editMode = True
-drawing = False
-isGas = True
-reading = 0
-material = ""
-powerloss = 0
-mouseR = mouseC = mouseCol = mouseRow = 0
-drawMode = 1
-viewMode = 0
-simTime = 0
-realstart_time = nowIs = pygame.time.get_ticks()
-maxNup = 6
-makeStep = 100
-frameRatioV = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-frameRatio = 0
-showPlot = True
-plotSteps = 0
-selected_material = 1
-selectedCells = []
-dKeyCount = 0
-
-# q = input("Load any data? ")
-q = ""
-if any(c in ["y", "Y", "t", "T"] for c in q):
-    dane = pcg.load_data()
-    if dane:
-        T, dP, Rth, massCp, gas, dt, g, timeV, maxTV = dane.get_data()
-        simTime = timeV[-1]
-else:
-    ### Array based solution thing
-    # pre processor to prepare the arrays
-    T, dP, m_ID = pcg.pre_processor(theGrid)
-    print(f"Array shape: {T.shape}")
-    # keepers for the solution data for plot
-    timeV = [0]
-    maxTV = [0]
-
 
 while running:
     # 1 Process input/events
@@ -167,22 +118,6 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 editMode = not editMode
-
-                if editMode and sourceActive:
-                    sourcePos = (mouseRow, mouseCol)
-
-                if not editMode and sourceActive:
-                    mouseRow, mouseCol = sourcePos
-
-            if event.key == pygame.K_s:
-                isGas = False
-
-            if event.key == pygame.K_r:
-                isGas = True
-
-            if event.key == pygame.K_h:
-
-                sourceActive = not sourceActive
 
             if event.key == pygame.K_g:
                 if g:
@@ -289,7 +224,7 @@ while running:
 
             if event.key == pygame.K_4:
                 if editMode:
-                    selected_material = 2
+                    selected_material = 3
                     if drawMode == 1:
                         m_ID[
                             min(selectedCells[1], selectedCells[3]) : max(
@@ -381,7 +316,7 @@ while running:
     makeStep += 1
     currentMax = T.max()
 
-    if makeStep > 5 or editMode:
+    if makeStep > stepsToDraw or editMode:
         makeStep = 0
 
         rows, cols = T.shape
@@ -391,8 +326,9 @@ while running:
                 pos_x = pixelCellW * c
                 pos_y = pixelCellH * r
                 if m_gas[m_ID[r, c]] or viewMode == 2:
-                    avT = T[r, c - 1 : c + 2].sum() / 3
-                    color = pcg.getColor(avT, 0, currentMax)
+                    # avT = T[r, c - 1 : c + 2].sum() / 3
+                    # color = pcg.getColor(avT, 0, currentMax)
+                    color = pcg.getColor(T[r, c], 0, currentMax)
                     if viewMode == 1:
                         color = m_colors[m_ID[r, c]]
 
@@ -472,7 +408,6 @@ while running:
             simTime += dt
 
             frameTime = (pygame.time.get_ticks() - nowIs) / 1000
-
             nowIs = pygame.time.get_ticks()
 
             if frameTime != 0:
@@ -487,8 +422,6 @@ while running:
                 frameRatioV.pop(0)
             frameRatio = sum(frameRatioV) / len(frameRatioV)
             ################
-
-            realTime = (nowIs - realstart_time) / 1000
 
             timeV.append(simTime)
             maxTV.append(currentMax)
