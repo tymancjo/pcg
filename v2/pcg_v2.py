@@ -204,6 +204,12 @@ def solve_conv(T_array, m_ID, gas_array, dt=1 / 100):
                 # up
                 if (T_array[r, c] > T_array[r - 1, c]) and m_ID[r, c] == m_ID[r - 1, c]:
                     T_array[r - 1, c], T_array[r, c] = T_array[r, c], T_array[r - 1, c]
+
+                # below is a tricky path for some kind of evaporate
+                elif (T_array[r, c] > 100) and m_ID[r - 1, c] == 0 and m_ID[r, c] == 3:
+                    # if it's a water cell, and hot, and above is air - lets evaporate
+                    m_ID[r, c] = 0
+
                 # up-left
                 elif (
                     T_array[r, c] > T_array[r - 1, c - 1]

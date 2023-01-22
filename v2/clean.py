@@ -117,17 +117,21 @@ font = pygame.font.Font(pygame.font.get_default_font(), 12)
 running = True
 
 sourceActive = False
-editMode = False
+editMode = True
 drawing = False
 isGas = True
 reading = 0
+material = ""
+powerloss = 0
 mouseR = mouseC = mouseCol = mouseRow = 0
 drawMode = 1
+viewMode = 0
 simTime = 0
 realstart_time = nowIs = pygame.time.get_ticks()
 maxNup = 6
 makeStep = 100
 frameRatioV = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+frameRatio = 0
 showPlot = True
 plotSteps = 0
 selected_material = 1
@@ -147,8 +151,8 @@ else:
     T, dP, m_ID = pcg.pre_processor(theGrid)
     print(f"Array shape: {T.shape}")
     # keepers for the solution data for plot
-    timeV = []
-    maxTV = []
+    timeV = [0]
+    maxTV = [0]
 
 
 while running:
@@ -186,6 +190,11 @@ while running:
                 else:
                     g = 9.81
 
+            if event.key == pygame.K_v:
+                viewMode += 1
+                if viewMode > 2:
+                    viewMode = 0
+
             if event.key == pygame.K_p:
                 if editMode:
                     plt.plot(timeV, maxTV)
@@ -194,7 +203,21 @@ while running:
             if event.key == pygame.K_w:
                 if editMode:
                     dane = pcg.dataKeeper(
-                        [T, dP, Rth, massCp, gas, dt, g, timeV, maxTV]
+                        # [T, dP, Rth, massCp, gas, dt, g, timeV, maxTV]
+                        [
+                            T,
+                            dP,
+                            m_ID,
+                            m_massCp,
+                            m_Rth,
+                            m_gas,
+                            m_name,
+                            m_colors,
+                            dt,
+                            g,
+                            timeV,
+                            maxTV,
+                        ]
                     )
                     if pcg.save_data(dane):
                         print("Save successful!")
@@ -205,7 +228,20 @@ while running:
                 if editMode:
                     dane = pcg.load_data()
                     if dane:
-                        T, dP, Rth, massCp, gas, dt, g, timeV, maxTV = dane.get_data()
+                        (
+                            T,
+                            dP,
+                            m_ID,
+                            m_massCp,
+                            m_Rth,
+                            m_gas,
+                            m_name,
+                            m_colors,
+                            dt,
+                            g,
+                            timeV,
+                            maxTV,
+                        ) = dane.get_data()
                         simTime = timeV[-1]
 
             if event.key == pygame.K_1:
@@ -354,28 +390,33 @@ while running:
             for c in range(cols):
                 pos_x = pixelCellW * c
                 pos_y = pixelCellH * r
-                if m_gas[m_ID[r, c]]:
+                if m_gas[m_ID[r, c]] or viewMode == 2:
                     avT = T[r, c - 1 : c + 2].sum() / 3
                     color = pcg.getColor(avT, 0, currentMax)
+                    if viewMode == 1:
+                        color = m_colors[m_ID[r, c]]
+
                     pygame.draw.rect(
                         screen,
                         color,
                         pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
                     )
                 else:
+
                     color = pcg.getColor(T[r, c], 0, currentMax)
                     pygame.draw.rect(
                         screen,
                         m_colors[m_ID[r, c]],
                         pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
                     )
-                    pygame.draw.rect(
-                        screen,
-                        color,
-                        pygame.Rect(
-                            pos_x + 1, pos_y + 1, pixelCellW - 2, pixelCellH - 2
-                        ),
-                    )
+                    if viewMode != 1:
+                        pygame.draw.rect(
+                            screen,
+                            color,
+                            pygame.Rect(
+                                pos_x + 1, pos_y + 1, pixelCellW - 2, pixelCellH - 2
+                            ),
+                        )
 
         if editMode:
             if drawing:
@@ -550,7 +591,7 @@ while running:
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(navi_left, 45))
 
-    text_string = f" Fr {frameRatio:.2f}".encode()
+    text_string = f" Fr {frameRatio:.2f} vm: {viewMode}".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(navi_left, 60))
 
