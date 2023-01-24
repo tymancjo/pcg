@@ -56,7 +56,7 @@ theGrid = [
 ]
 # ########################################
 # pre processor to prepare the arrays
-T, dP, m_ID = pcg.pre_processor(theGrid)
+T, dP, m_ID, vV = pcg.pre_processor(theGrid)
 
 
 # initial global conditions ##############
@@ -400,7 +400,7 @@ while running:
         if True:
 
             ######
-            pcg.solve_cond(T, dP, m_ID, m_massCp, m_Rth, dt)
+            pcg.solve_cond_with_v(T, dP, vV, m_ID, m_massCp, m_Rth, dx, dt, g)
             ######
             pcg.open_air_boundary(T)
             ######
@@ -426,27 +426,26 @@ while running:
             timeV.append(simTime)
             maxTV.append(currentMax)
 
-            s = g * (((currentMax + 35) / 35) - 1) * dt * dt
+            s = vV.max() * dt
             if s > dx / 2:
                 N = math.floor(s / dx) + 1
                 N = max(2, N)
 
                 if N > maxNup:
                     dt = dt * maxNup / N
-                    s = g * (((currentMax + 35) / 35) - 1) * dt * dt
+                    s = vV.max() * dt
                     N = math.floor(s / dx) + 1
                 if N < maxNup and simTime > 30:
                     dt = dt * maxNup / N
-                    s = g * (((currentMax + 35) / 35) - 1) * dt * dt
+                    s = vV.max() * dt
                     N = math.floor(s / dx) + 1
 
-                N = max(2, N)
-                if dt < 1 / 50_000:
-                    dt = 1 / 1000
+                # N = max(2, N)
+                # if dt < 1 / 50_000:
+                #     dt = 1 / 1000
 
         if s > 0:
-            for _ in range(N):
-                pcg.solve_conv(T, m_ID, m_gas, dt)
+            pcg.solve_conv(T, m_ID, vV, m_gas, dx, N, dt)
 
         reading = T[mouseRow][mouseCol]
         material = m_name[m_ID[mouseRow][mouseCol]]

@@ -122,7 +122,7 @@ def pre_processor(the_grid):
     T_array = np.zeros(the_shape)
     dP_array = np.zeros(the_shape)
     material_ID = np.zeros(the_shape)
-    gas_array = np.zeros(the_shape)
+    s_array = np.zeros(the_shape)
 
     # now let's fill them up with the data:
     for r, row in enumerate(the_grid):
@@ -130,9 +130,8 @@ def pre_processor(the_grid):
             T_array[r, c] = cell.T
             dP_array[r, c] = cell.dP
             material_ID[r, c] = int(cell.ID)
-            # gas_array[r, c] = cell.gas
 
-    return T_array, dP_array, material_ID.astype(int)  # , gas_array
+    return T_array, dP_array, material_ID.astype(int), s_array  # , gas_array
 
 
 @njit
@@ -145,7 +144,18 @@ def solve_heat(T_array, dP_array, massCp_array, dt=1 / 100):
 
 
 @njit
-def solve_cond(T_array, dP_array, m_ID, massCp_array, Rth_array, dt=1 / 100):
+def solve_cond_with_v(
+    T_array,
+    dP_array,
+    v_array,
+    m_ID,
+    massCp_array,
+    Rth_array,
+    gas_array,
+    dx,
+    dt=1 / 100,
+    g=9.81,
+):
     # T, dP, m_ID, m_massCp, m_Rth, dt
     rows, cols = T_array.shape
     direction = True
@@ -189,57 +199,112 @@ def solve_cond(T_array, dP_array, m_ID, massCp_array, Rth_array, dt=1 / 100):
             T_array[r, c] -= dQ / massCp_array[m_ID[r, c]]
             T_array[r + 1, c] += dQ / massCp_array[m_ID[r + 1, c]]
 
+            if gas_array[m_ID[r, c]]:
+                v_array[r, c] += g * (((T_array[r, c] + 35) / 35) - 1) * dt
+            else:
+                v_array[r, c] = 0
+
 
 @njit
-def solve_conv(T_array, m_ID, gas_array, dt=1 / 100):
+def solve_conv(T_array, m_ID, vV, gas_array, dx, N=1, dt=1 / 100):
 
     rows, cols = T_array.shape
 
-    for r in range(1, rows - 1):
-        for c in range(1, cols - 1):
-            if gas_array[m_ID[r, c]] and (
-                T_array[r, c] > T_array[r, c - 1] or T_array[r, c + 1]
-            ):
-                # if this is a gas cell and it's hotter then the adjacted ones (L or R)
-                # up
-                if (T_array[r, c] > T_array[r - 1, c]) and m_ID[r, c] == m_ID[r - 1, c]:
-                    T_array[r - 1, c], T_array[r, c] = T_array[r, c], T_array[r - 1, c]
+    for n in range(N):
+        this_s = n * dx
 
-                # below is a tricky path for some kind of evaporate
-                elif (T_array[r, c] > 100) and m_ID[r - 1, c] == 0 and m_ID[r, c] == 3:
-                    # if it's a water cell, and hot, and above is air - lets evaporate
-                    m_ID[r, c] = 0
+        for r in range(1, rows - 1):
+            for c in range(1, cols - 1):
+                s = vV[r, c] * dt
+                if s >= this_s:
 
-                # up-left
-                elif (
-                    T_array[r, c] > T_array[r - 1, c - 1]
-                    and m_ID[r, c] == m_ID[r - 1, c - 1]
-                ):
-                    T_array[r - 1, c - 1], T_array[r, c] = (
-                        T_array[r, c],
-                        T_array[r - 1, c - 1],
-                    )
-                # up-right
-                elif (
-                    T_array[r, c] > T_array[r - 1, c + 1]
-                    and m_ID[r, c] == m_ID[r - 1, c + 1]
-                ):
-                    T_array[r - 1, c + 1], T_array[r, c] = (
-                        T_array[r, c],
-                        T_array[r - 1, c + 1],
-                    )
-                # -left
-                elif T_array[r, c] > T_array[r, c - 1] and m_ID[r, c] == m_ID[r, c - 1]:
-                    T_array[r, c - 1], T_array[r, c] = T_array[r, c], T_array[r, c - 1]
-                # -right
-                elif T_array[r, c] > T_array[r, c + 1] and m_ID[r, c] == m_ID[r, c + 1]:
-                    T_array[r, c + 1], T_array[r, c] = T_array[r, c], T_array[r, c + 1]
+                    if gas_array[m_ID[r, c]] and (
+                        T_array[r, c] > T_array[r, c - 1] or T_array[r, c + 1]
+                    ):
+                        # if this is a gas cell and it's hotter then the adjacted ones (L or R)
+                        # up
+                        if (T_array[r, c] > T_array[r - 1, c]) and m_ID[r, c] == m_ID[
+                            r - 1, c
+                        ]:
+                            T_array[r - 1, c], T_array[r, c] = (
+                                T_array[r, c],
+                                T_array[r - 1, c],
+                            )
+                            vV[r - 1, c], vV[r, c] = (
+                                vV[r, c],
+                                vV[r - 1, c],
+                            )
+                            # vV[r, c] = 0
+
+                        # below is a tricky path for some kind of evaporate
+                        # elif (T_array[r, c] > 100) and m_ID[r - 1, c] == 0 and m_ID[r, c] == 3:
+                        #     # if it's a water cell, and hot, and above is air - lets evaporate
+                        #     m_ID[r, c] = 0
+
+                        # up-left
+                        elif (
+                            T_array[r, c] > T_array[r - 1, c - 1]
+                            and m_ID[r, c] == m_ID[r - 1, c - 1]
+                        ):
+                            T_array[r - 1, c - 1], T_array[r, c] = (
+                                T_array[r, c],
+                                T_array[r - 1, c - 1],
+                            )
+                            vV[r - 1, c - 1], vV[r, c] = (
+                                vV[r, c],
+                                vV[r - 1, c - 1],
+                            )
+                            # vV[r, c] = 0
+                        # up-right
+                        elif (
+                            T_array[r, c] > T_array[r - 1, c + 1]
+                            and m_ID[r, c] == m_ID[r - 1, c + 1]
+                        ):
+                            T_array[r - 1, c + 1], T_array[r, c] = (
+                                T_array[r, c],
+                                T_array[r - 1, c + 1],
+                            )
+                            vV[r - 1, c + 1], vV[r, c] = (
+                                vV[r, c],
+                                vV[r - 1, c + 1],
+                            )
+                            # vV[r, c] = 0
+                        # -left
+                        elif (
+                            T_array[r, c] > T_array[r, c - 1]
+                            and m_ID[r, c] == m_ID[r, c - 1]
+                        ):
+                            T_array[r, c - 1], T_array[r, c] = (
+                                T_array[r, c],
+                                T_array[r, c - 1],
+                            )
+                            vV[r, c - 1], vV[r, c] = (
+                                vV[r, c],
+                                vV[r, c - 1],
+                            )
+                            # vV[r, c] = 0
+                        # -right
+                        elif (
+                            T_array[r, c] > T_array[r, c + 1]
+                            and m_ID[r, c] == m_ID[r, c + 1]
+                        ):
+                            T_array[r, c + 1], T_array[r, c] = (
+                                T_array[r, c],
+                                T_array[r, c + 1],
+                            )
+                            vV[r, c + 1], vV[r, c] = (
+                                vV[r, c],
+                                vV[r, c + 1],
+                            )
+                            # vV[r, c] = 0
 
 
-def open_air_boundary(T_array):
+def open_air_boundary(T_array, vV):
     rows, cols = T_array.shape
 
     T_array[0, :] *= 0.25
     T_array[-1, :] = 0
     T_array[:, 0] = 0
     T_array[:, -1] = 0
+
+    vV[0, :] = 0
