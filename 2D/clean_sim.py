@@ -30,8 +30,8 @@ HEIGHT = rows * pixelSize
 FPS = 500
 BLACK = (0, 0, 0)
 
-pixelCellW = int(WIDTH / cols)
-pixelCellH = int(HEIGHT / rows)
+pixelCellW = pW0 = int(WIDTH / cols)
+pixelCellH = pH0 = int(HEIGHT / rows)
 
 # some handy data fo the navi panel
 # Navi pane size
@@ -77,9 +77,9 @@ editMode = True  # we start in stopped mode
 drawing = False  # for the track of edit behavior
 zoom = 1
 zoom_left = 0
-zoom_right = -1
+zoom_right = cols
 zoom_top = 0
-zoom_bottom = -1
+zoom_bottom = rows
 
 drawMode = 1
 viewMode = 0
@@ -240,10 +240,16 @@ while running:
                 zoom += 1
                 if zoom > 4:
                     zoom = 4
-                else:
+
+                if zoom > 1:
                     pixelCellH *= 2
                     pixelCellW *= 2
 
+                    zoom_right = zoom_left + math.floor(W0 / pixelCellW)
+                    zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+                else:
+                    pixelCellH = pH0
+                    pixelCellW = pW0
                     zoom_right = zoom_left + math.floor(W0 / pixelCellW)
                     zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
 
@@ -251,13 +257,16 @@ while running:
                 zoom -= 1
                 if zoom < 1:
                     zoom = 1
+
+                if zoom > 1:
+                    pixelCellH *= 2
+                    pixelCellW *= 2
+
+                    zoom_right = zoom_left + math.floor(W0 / pixelCellW)
+                    zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
                 else:
-                    pixelCellH *= 0.5
-                    pixelCellW *= 0.5
-
-                    zoom_left = max(0, zoom_left)
-                    zoom_top = max(0, zoom_top)
-
+                    pixelCellH = pH0
+                    pixelCellW = pW0
                     zoom_right = zoom_left + math.floor(W0 / pixelCellW)
                     zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
 
@@ -289,7 +298,7 @@ while running:
                 if editMode:
                     selected_material = 0
                     if drawMode == 1:
-                        m_ID[
+                        thisID[
                             min(selectedCells[1], selectedCells[3]) : max(
                                 selectedCells[1], selectedCells[3]
                             ),
@@ -304,7 +313,7 @@ while running:
                 if editMode:
                     selected_material = 1
                     if drawMode == 1:
-                        m_ID[
+                        thisID[
                             min(selectedCells[1], selectedCells[3]) : max(
                                 selectedCells[1], selectedCells[3]
                             ),
@@ -319,7 +328,7 @@ while running:
                 if editMode:
                     selected_material = 2
                     if drawMode == 1:
-                        m_ID[
+                        thisID[
                             min(selectedCells[1], selectedCells[3]) : max(
                                 selectedCells[1], selectedCells[3]
                             ),
@@ -332,7 +341,7 @@ while running:
                 if editMode:
                     selected_material = 3
                     if drawMode == 1:
-                        m_ID[
+                        thisID[
                             min(selectedCells[1], selectedCells[3]) : max(
                                 selectedCells[1], selectedCells[3]
                             ),
@@ -344,7 +353,7 @@ while running:
             if event.key == pygame.K_7:
                 if editMode:
                     if drawMode == 1:
-                        dP[
+                        this_dP[
                             min(selectedCells[1], selectedCells[3]) : max(
                                 selectedCells[1], selectedCells[3]
                             ),
@@ -356,7 +365,7 @@ while running:
             if event.key == pygame.K_8:
                 if editMode:
                     if drawMode == 1:
-                        dP[
+                        this_dP[
                             min(selectedCells[1], selectedCells[3]) : max(
                                 selectedCells[1], selectedCells[3]
                             ),
@@ -368,7 +377,7 @@ while running:
             if event.key == pygame.K_9:
                 if editMode:
                     if drawMode == 1:
-                        dP[
+                        this_dP[
                             min(selectedCells[1], selectedCells[3]) : max(
                                 selectedCells[1], selectedCells[3]
                             ),
@@ -380,7 +389,7 @@ while running:
             if event.key == pygame.K_0:
                 if editMode:
                     if drawMode == 1:
-                        dP[
+                        this_dP[
                             min(selectedCells[1], selectedCells[3]) : max(
                                 selectedCells[1], selectedCells[3]
                             ),
@@ -442,6 +451,7 @@ while running:
             currentMax = dispVal.max()
 
         thisID = m_ID[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+        this_dP = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
         rows, cols = dispVal.shape
 
         pixelCellH = math.floor(HEIGHT / rows)
@@ -578,9 +588,9 @@ while running:
                 # if dt < 1 / 50_000:
                 #     dt = 1 / 1000
 
-        reading = T[mouseRow][mouseCol]
-        material = m_name[m_ID[mouseRow][mouseCol]]
-        powerloss = dP[mouseRow][mouseCol]
+        reading = dispVal[mouseRow][mouseCol]
+        material = m_name[thisID[mouseRow][mouseCol]]
+        powerloss = dP[mouseRow + zoom_top][mouseCol + zoom_left]
 
         # pygame.draw.rect(screen, (0, 255, 0), pygame.Rect(navi_start, 0, 10, 10))
     else:
