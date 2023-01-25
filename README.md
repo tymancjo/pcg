@@ -87,8 +87,10 @@ To do plan:
         - [x] Set power generation
 
 - [ ] Visual stuff 
-    - [ ] Zoom
+    - [x] Zoom
     - [ ] Pan
+        - [x] Manual pan
+        - [ ] Auto pan with pressed keys
     - [x] Display modes 
         - [x] Normal 
         - [x] Temperature
