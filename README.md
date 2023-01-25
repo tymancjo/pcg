@@ -12,6 +12,28 @@ The solver basically solves the system in form of simulation - this means iterat
 - Heat conduction (thermal conduction)
 - Heat convection (however quite nicely working - it's simplified approximation model)
 
+# Basic info of usage
+
+        # keys used:
+        # space - simulation/edit mode toggle
+        # g - turn on/off gravity
+        # v - cycle over view modes - result field with shapes, materials, just result field
+        # p - [in edit mode] plots the temperature plot
+        # w = [in edit mode] save the simulation data - will ask about filename in terminal
+        # l - [in edit mode] loads the simulation data - will ask about filename in terminal
+        # q - [in edit mode] if pressed 5 times reset the solution to initial state.
+        # d - [in edit mode] toggle drawing mode from rectangle to paint mode
+        # d - [in sim mode] toggle the result field [Temperature, Velocity]
+        # z/x - zoom in and out
+        #
+        # 1 .. 4 - [in edit mode] select the Nth material from database
+        # 1 - [in sim mode] decrease the maxN value
+        # 2 - [in sim mode] increase the maxN value
+        #
+        # 7 - [in edit mode] increase selected cells power loss by 0.1
+        # 8 - [in edit mode] increase selected cells power loss by 1
+        # 9 - [in edit mode] increase selected cells power loss by 10
+        # 0 - [in edit mode] rester selected cells power loss to 0
 
 # PCG V2 2D concept of work 
 

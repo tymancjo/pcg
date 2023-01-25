@@ -25,7 +25,7 @@ cols = 60
 
 # display and pixel data
 pixelSize = int(min(1000 / cols, 1000 / rows))
-WIDTH = cols * pixelSize
+WIDTH = W0 = cols * pixelSize
 HEIGHT = rows * pixelSize
 FPS = 500
 BLACK = (0, 0, 0)
@@ -75,6 +75,12 @@ maxTV = [0]
 # needed global values ##############################
 editMode = True  # we start in stopped mode
 drawing = False  # for the track of edit behavior
+zoom = 1
+zoom_left = 0
+zoom_right = -1
+zoom_top = 0
+zoom_bottom = -1
+
 drawMode = 1
 viewMode = 0
 stepsToDraw = 10
@@ -84,7 +90,7 @@ makeStep = 100
 frameRatioV = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 frameRatio = 0
 showPlot = True
-colorsT = True
+colorsT = not True
 plotSteps = 0
 selected_material = 1
 selectedCells = []
@@ -118,6 +124,27 @@ while running:
         ## listening for the the X button at the top
         if event.type == pygame.QUIT:
             running = False
+
+        # keys used:
+        # space - simulation/edit mode toggle
+        # g - turn on/off gravity
+        # v - cycle over view modes - result field with shapes, materials, just result field
+        # p - [in edit mode] plots the temperature plot
+        # w = [in edit mode] save the simulation data - will ask about filename in terminal
+        # l - [in edit mode] loads the simulation data - will ask about filename in terminal
+        # q - [in edit mode] if pressed 5 times reset the solution to initial state.
+        # d - [in edit mode] toggle drawing mode from rectangle to paint mode
+        # d - [in sim mode] toggle the result field [Temperature, Velocity]
+        # z/x - zoom in and out
+        #
+        # 1 .. 4 - [in edit mode] select the Nth material from database
+        # 1 - [in sim mode] decrease the maxN value
+        # 2 - [in sim mode] increase the maxN value
+        #
+        # 7 - [in edit mode] increase selected cells power loss by 0.1
+        # 8 - [in edit mode] increase selected cells power loss by 1
+        # 9 - [in edit mode] increase selected cells power loss by 10
+        # 0 - [in edit mode] rester selected cells power loss to 0
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
@@ -185,6 +212,78 @@ while running:
 
                         # just hacking the steel color:
                         m_colors[1] = (25, 25, 25)
+
+            if event.key == pygame.K_q:
+                if editMode:
+                    dKeyCount += 1
+                    if dKeyCount > 3:
+                        dKeyCount = 0
+                        timeV = [0]
+                        maxTV = [0]
+                        T[:, :] = 0.0
+                        simTime = 0
+
+            if event.key == pygame.K_d:
+                if editMode:
+                    drawMode += 1
+                    if drawMode > 1:
+                        drawMode = 0
+                else:
+                    if colorsT:
+                        dispVal = vV
+                        colorsT = False
+                    else:
+                        dispVal = T
+                        colorsT = True
+
+            if event.key == pygame.K_z:
+                zoom += 1
+                if zoom > 4:
+                    zoom = 4
+                else:
+                    pixelCellH *= 2
+                    pixelCellW *= 2
+
+                    zoom_right = zoom_left + math.floor(W0 / pixelCellW)
+                    zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+
+            if event.key == pygame.K_x:
+                zoom -= 1
+                if zoom < 1:
+                    zoom = 1
+                else:
+                    pixelCellH *= 0.5
+                    pixelCellW *= 0.5
+
+                    zoom_left = max(0, zoom_left)
+                    zoom_top = max(0, zoom_top)
+
+                    zoom_right = zoom_left + math.floor(W0 / pixelCellW)
+                    zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+
+            if event.key == pygame.K_LEFT:
+                zoom_left += 1
+                zoom_left = max(
+                    0, min(zoom_left, T.shape[1] - math.floor(W0 / pixelCellW))
+                )
+                zoom_right = zoom_left + math.floor(W0 / pixelCellW)
+                print(zoom_left)
+
+            if event.key == pygame.K_RIGHT:
+                zoom_left -= 1
+                zoom_left = max(0, zoom_left)
+                zoom_right = zoom_left + math.floor(W0 / pixelCellW)
+                print(zoom_left)
+
+            if event.key == pygame.K_UP:
+                zoom_top += 1
+                zoom_top = min(zoom_top, T.shape[0] - math.floor(HEIGHT / pixelCellH))
+                zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+
+            if event.key == pygame.K_DOWN:
+                zoom_top -= 1
+                zoom_top = max(0, zoom_top)
+                zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
 
             if event.key == pygame.K_1:
                 if editMode:
@@ -290,29 +389,6 @@ while running:
                             ),
                         ] = 0
 
-            if event.key == pygame.K_q:
-                if editMode:
-                    dKeyCount += 1
-                    if dKeyCount > 3:
-                        dKeyCount = 0
-                        timeV = [0]
-                        maxTV = [0]
-                        T[:, :] = 0.0
-                        simTime = 0
-
-            if event.key == pygame.K_d:
-                if editMode:
-                    drawMode += 1
-                    if drawMode > 1:
-                        drawMode = 0
-                else:
-                    if colorsT:
-                        dispVal = vV
-                        colorsT = False
-                    else:
-                        dispVal = T
-                        colorsT = True
-
         # handle MOUSEBUTTONUP
         if event.type == pygame.MOUSEBUTTONDOWN:
 
@@ -342,7 +418,8 @@ while running:
                             pass
 
                 else:
-                    reading = T[mouseR][mouseC]
+                    # reading = dispVal[mouseR][mouseC]
+                    pass
 
         if event.type == pygame.MOUSEBUTTONUP:
             pos = pygame.mouse.get_pos()
@@ -353,26 +430,36 @@ while running:
 
     # 3Draw/render step count - to not draw each calculation step
     makeStep += 1
-    if colorsT:
-        currentMax = T.max()
-    else:
-        currentMax = vV.max()
 
     if makeStep > stepsToDraw or editMode:
         makeStep = 0
 
-        rows, cols = T.shape
+        if colorsT:
+            dispVal = vV[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+            currentMax = dispVal.max()
+        else:
+            dispVal = T[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+            currentMax = dispVal.max()
+
+        thisID = m_ID[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+        rows, cols = dispVal.shape
+
+        pixelCellH = math.floor(HEIGHT / rows)
+        pixelCellW = math.floor(W0 / cols)
+        # print(pixelCellH, pixelCellW, zoom)
+
+        # drawing the colors of the temperatures
         for r in range(rows):
-            # drawing the colors of the temperatures
             for c in range(cols):
                 pos_x = pixelCellW * c
                 pos_y = pixelCellH * r
-                if m_gas[m_ID[r, c]] or viewMode == 2:
+
+                if m_gas[thisID[r, c]] or viewMode == 2:
                     # avT = T[r, c - 1 : c + 2].sum() / 3
                     # color = pcg.getColor(avT, 0, currentMax)
                     color = pcg.getColor(dispVal[r, c], 0, currentMax)
                     if viewMode == 1:
-                        color = m_colors[m_ID[r, c]]
+                        color = m_colors[thisID[r, c]]
 
                     pygame.draw.rect(
                         screen,
@@ -384,7 +471,7 @@ while running:
                     color = pcg.getColor(dispVal[r, c], 0, currentMax)
                     pygame.draw.rect(
                         screen,
-                        m_colors[m_ID[r, c]],
+                        m_colors[thisID[r, c]],
                         pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
                     )
                     if viewMode != 1:
