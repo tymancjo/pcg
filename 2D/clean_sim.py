@@ -250,6 +250,8 @@ while running:
                 else:
                     pixelCellH = pH0
                     pixelCellW = pW0
+                    zoom_left = 0
+                    zoom_top = 0
                     zoom_right = zoom_left + math.floor(W0 / pixelCellW)
                     zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
 
@@ -259,14 +261,16 @@ while running:
                     zoom = 1
 
                 if zoom > 1:
-                    pixelCellH *= 2
-                    pixelCellW *= 2
+                    pixelCellH *= 0.5
+                    pixelCellW *= 0.5
 
                     zoom_right = zoom_left + math.floor(W0 / pixelCellW)
                     zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
                 else:
                     pixelCellH = pH0
                     pixelCellW = pW0
+                    zoom_left = 0
+                    zoom_top = 0
                     zoom_right = zoom_left + math.floor(W0 / pixelCellW)
                     zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
 
