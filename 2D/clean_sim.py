@@ -36,6 +36,8 @@ offset_pix_y = int((HEIGHT - H0) / 2)
 pixelCellW = pW0 = int(W0 / cols)
 pixelCellH = pH0 = int(H0 / rows)
 
+screen_size0 = max(W0, H0)
+
 # some handy data fo the navi panel
 # Navi pane size
 navi_size = 200  # px
@@ -101,6 +103,9 @@ mouseR = mouseC = mouseCol = mouseRow = 0
 dKeyCount = 0  # used to count "Q" presses for reset
 nowIs = 0
 
+move_vector = [0, 0]
+move_frame = 0
+
 # initial text to put on screen
 reading = 0
 powerloss = 0
@@ -148,6 +153,10 @@ while running:
         # 8 - [in edit mode] increase selected cells power loss by 1
         # 9 - [in edit mode] increase selected cells power loss by 10
         # 0 - [in edit mode] rester selected cells power loss to 0
+
+        if event.type == pygame.KEYUP:
+            if event.key in [pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN]:
+                move_vector = [0, 0]
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
@@ -244,66 +253,67 @@ while running:
                 if zoom > 4:
                     zoom = 4
 
-                if zoom > 1:
-                    # pixelCellH *= 2
-                    # pixelCellW *= 2
+                # if zoom > 1:
+                if True:
                     pixelCellH = pH0 * zoom
                     pixelCellW = pW0 * zoom
 
-                    zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                    zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
-                else:
-                    pixelCellH = pH0
-                    pixelCellW = pW0
-                    zoom_left = 0
-                    zoom_top = 0
-                    zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                    zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
+                    maxCellsCols = math.floor((screen_size0 / pixelCellW))
+                    maxCellsRows = math.floor((screen_size0 / pixelCellH))
+
+                    zoom_right = min(maxCellsCols, T.shape[1])
+                    zoom_bottom = min(maxCellsRows, T.shape[0])
+
+                    if zoom_left + zoom_right >= T.shape[1]:
+                        zoom_left = T.shape[1] - zoom_right
+                    if zoom_left >= zoom_right:
+                        zoom_left = max(0, zoom_right - maxCellsCols)
+
+                    if zoom_top + zoom_bottom >= T.shape[0]:
+                        zoom_top = T.shape[0] - zoom_bottom
+                    if zoom_top >= zoom_bottom:
+                        zoom_top = max(0, zoom_bottom - maxCellsRows)
+
+                print(f"zoom top {zoom_top, zoom_bottom}, left {zoom_left,zoom_right}")
 
             if event.key == pygame.K_x:
                 zoom -= 1
                 if zoom < 1:
                     zoom = 1
 
-                if zoom > 1:
-                    # pixelCellH *= 0.5
-                    # pixelCellW *= 0.5
+                if True:
                     pixelCellH = pH0 * zoom
                     pixelCellW = pW0 * zoom
 
-                    zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                    zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
-                else:
-                    pixelCellH = pH0
-                    pixelCellW = pW0
-                    zoom_left = 0
-                    zoom_top = 0
-                    zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                    zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
+                    maxCellsCols = math.floor((screen_size0 / pixelCellW))
+                    maxCellsRows = math.floor((screen_size0 / pixelCellH))
+
+                    zoom_right = min(maxCellsCols, T.shape[1])
+                    zoom_bottom = min(maxCellsRows, T.shape[0])
+
+                    if zoom_left + zoom_right >= T.shape[1]:
+                        zoom_left = T.shape[1] - zoom_right
+                    if zoom_left >= zoom_right:
+                        zoom_left = max(0, zoom_right - maxCellsCols)
+
+                    if zoom_top + zoom_bottom >= T.shape[0]:
+                        zoom_top = T.shape[0] - zoom_bottom
+                    if zoom_top >= zoom_bottom:
+                        zoom_top = max(0, zoom_bottom - maxCellsRows)
+
+                print(f"zoom top {zoom_top, zoom_bottom}, left {zoom_left,zoom_right}")
 
             if event.key == pygame.K_LEFT:
-                zoom_left += 1
-                zoom_left = max(
-                    0, min(zoom_left, T.shape[1] - math.floor(W0 / pixelCellW))
-                )
-                zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                print(zoom_left)
+                move_vector[0] = -1
 
             if event.key == pygame.K_RIGHT:
-                zoom_left -= 1
-                zoom_left = max(0, zoom_left)
-                zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                print(zoom_left)
+                move_vector[0] = 1
 
             if event.key == pygame.K_UP:
-                zoom_top += 1
-                zoom_top = min(zoom_top, T.shape[0] - math.floor(H0 / pixelCellH))
-                zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+                move_vector[1] = -1
 
             if event.key == pygame.K_DOWN:
-                zoom_top -= 1
-                zoom_top = max(0, zoom_top)
-                zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
+                move_vector[1] = 1
 
             if event.key == pygame.K_1:
                 if editMode:
@@ -462,6 +472,11 @@ while running:
     if makeStep > stepsToDraw or editMode:
         makeStep = 0
 
+        # cleaning the screen
+        pygame.draw.rect(
+            screen, (10, 10, 10), pygame.Rect(0, 0, screen_size0, screen_size0)
+        )
+
         if colorsT:
             dispVal = vV[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
             currentMax = dispVal.max()
@@ -469,13 +484,36 @@ while running:
             dispVal = T[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
             currentMax = dispVal.max()
 
+        # ################### #
+        # handling scrolling: #
+        # ################### #
+        move_frame += 1
+        if move_frame == 1 and (move_vector[0] != 0 or move_vector[1] != 0):
+            zoom_left += move_vector[0]
+            zoom_left = max(
+                0,
+                min(zoom_left, T.shape[1] - math.floor(screen_size0 / pixelCellW)),
+            )
+            zoom_right = zoom_left + math.floor(screen_size0 / pixelCellW)
+
+            zoom_top += move_vector[1]
+            zoom_top = min(zoom_top, T.shape[0] - math.floor(screen_size0 / pixelCellH))
+            zoom_top = max(0, zoom_top)
+            zoom_bottom = zoom_top + math.floor(screen_size0 / pixelCellH)
+
+        if move_frame > 5:
+            move_frame = 0
+
         thisID = m_ID[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
         this_dP = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
         rows, cols = dispVal.shape
 
-        pixelCellH = math.floor(HEIGHT / rows)
-        pixelCellW = math.floor(W0 / cols)
-        # print(pixelCellH, pixelCellW, zoom)
+        pixelCellH = pixelCellW = math.floor(
+            min(screen_size0 / rows, screen_size0 / cols)
+        )
+
+        offset_pix_x = int((screen_size0 - pixelCellW * cols) / 2)
+        offset_pix_y = int((screen_size0 - pixelCellH * rows) / 2)
 
         # drawing the colors of the temperatures
         for r in range(rows):
@@ -607,9 +645,11 @@ while running:
                 # if dt < 1 / 50_000:
                 #     dt = 1 / 1000
 
+        mouseRow = max(0, min(mouseRow, dispVal.shape[0] - 1))
+        mouseCol = max(0, min(mouseCol, dispVal.shape[1] - 1))
         reading = dispVal[mouseRow][mouseCol]
         material = m_name[thisID[mouseRow][mouseCol]]
-        powerloss = dP[mouseRow + zoom_top][mouseCol + zoom_left]
+        powerloss = this_dP[mouseRow][mouseCol]
 
         # pygame.draw.rect(screen, (0, 255, 0), pygame.Rect(navi_start, 0, 10, 10))
     else:
