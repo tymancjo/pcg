@@ -20,7 +20,7 @@ m_colors = [c.color for c in materials]
 # ######################################################
 
 # Simulation grid size definition
-rows = 200
+rows = 300
 cols = 60
 
 # display and pixel data
@@ -106,10 +106,12 @@ nowIs = 0
 move_vector = [0, 0]
 move_frame = 0
 
+
 # initial text to put on screen
 reading = 0
 powerloss = 0
 material = m_name[selected_material]
+source_power = 0
 
 
 ## initialize pygame and create window
@@ -144,15 +146,17 @@ while running:
         # d - [in edit mode] toggle drawing mode from rectangle to paint mode
         # d - [in sim mode] toggle the result field [Temperature, Velocity]
         # z/x - zoom in and out
+        # arrow keys - moving canvas in zoom mode
         #
         # 1 .. 4 - [in edit mode] select the Nth material from database
         # 1 - [in sim mode] decrease the maxN value
         # 2 - [in sim mode] increase the maxN value
         #
-        # 7 - [in edit mode] increase selected cells power loss by 0.1
-        # 8 - [in edit mode] increase selected cells power loss by 1
-        # 9 - [in edit mode] increase selected cells power loss by 10
-        # 0 - [in edit mode] rester selected cells power loss to 0
+        # 7 - [in edit mode] increase (decrease with Shift) defined source power loss by 0.1
+        # 8 - [in edit mode] increase (decrease with Shift) defined source power loss by 1
+        # 9 - [in edit mode] increase (decrease with Shift) defined source power loss by 10
+        # 0 - [in edit mode] reset defined source power loss to 0
+        # ENTER - apply defined source dP value to selected cells
 
         if event.type == pygame.KEYUP:
             if event.key in [pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN]:
@@ -161,6 +165,29 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 editMode = not editMode
+
+            if event.key == pygame.K_r:
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_SHIFT:
+                    # resetting the simulation cavas and setup
+                    grid_size = int(screen_size0 / pixelSize)
+                    pixelCellH = pixelCellW = pixelSize
+
+                    T = np.zeros((grid_size, grid_size))
+                    vV = np.zeros((grid_size, grid_size))
+                    dP = np.zeros((grid_size, grid_size))
+                    m_ID = np.zeros((grid_size, grid_size)).astype(int)
+
+                    dt = 1 / 10
+                    dx = 10e-3
+                    g = 9.81
+                    timeV = [0]
+                    maxTV = [0]
+                    simTime = 0
+
+                    zoom = 1
+                    zoom_left = zoom_top = 0
+                    zoom_right = zoom_bottom = grid_size
 
             if event.key == pygame.K_g:
                 if g:
@@ -223,7 +250,10 @@ while running:
                         simTime = timeV[-1]
 
                         # just hacking the steel color:
-                        m_colors[1] = (25, 25, 25)
+                        # m_colors[1] = (25, 25, 25)
+                        zoom = 1
+                        zoom_left = zoom_top = 0
+                        zoom_right = zoom_bottom = grid_size
 
             if event.key == pygame.K_q:
                 if editMode:
@@ -372,42 +402,30 @@ while running:
                         ] = 3
 
             if event.key == pygame.K_7:
-                if editMode:
-                    if drawMode == 1:
-                        this_dP[
-                            min(selectedCells[1], selectedCells[3]) : max(
-                                selectedCells[1], selectedCells[3]
-                            ),
-                            min(selectedCells[0], selectedCells[2]) : max(
-                                selectedCells[0], selectedCells[2]
-                            ),
-                        ] += 0.1
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_SHIFT:
+                    source_power -= 0.1
+                else:
+                    source_power += 0.1
 
             if event.key == pygame.K_8:
-                if editMode:
-                    if drawMode == 1:
-                        this_dP[
-                            min(selectedCells[1], selectedCells[3]) : max(
-                                selectedCells[1], selectedCells[3]
-                            ),
-                            min(selectedCells[0], selectedCells[2]) : max(
-                                selectedCells[0], selectedCells[2]
-                            ),
-                        ] += 1
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_SHIFT:
+                    source_power -= 1
+                else:
+                    source_power += 1
 
             if event.key == pygame.K_9:
-                if editMode:
-                    if drawMode == 1:
-                        this_dP[
-                            min(selectedCells[1], selectedCells[3]) : max(
-                                selectedCells[1], selectedCells[3]
-                            ),
-                            min(selectedCells[0], selectedCells[2]) : max(
-                                selectedCells[0], selectedCells[2]
-                            ),
-                        ] += 10
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_SHIFT:
+                    source_power -= 10
+                else:
+                    source_power += 10
 
             if event.key == pygame.K_0:
+                source_power = 0
+
+            if event.key == pygame.K_RETURN:
                 if editMode:
                     if drawMode == 1:
                         this_dP[
@@ -417,7 +435,7 @@ while running:
                             min(selectedCells[0], selectedCells[2]) : max(
                                 selectedCells[0], selectedCells[2]
                             ),
-                        ] = 0
+                        ] = source_power
 
         # handle MOUSEBUTTONUP
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -474,7 +492,7 @@ while running:
 
         # cleaning the screen
         pygame.draw.rect(
-            screen, (10, 10, 10), pygame.Rect(0, 0, screen_size0, screen_size0)
+            screen, (25, 25, 50), pygame.Rect(0, 0, screen_size0, screen_size0)
         )
 
         if colorsT:
@@ -729,12 +747,16 @@ while running:
 
     text_string = f"Selected: {m_name[selected_material]}".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
-    screen.blit(text_surface, dest=(navi_left, 100))
+    screen.blit(text_surface, dest=(navi_left, 80))
 
     if editMode:
         text_string = f"Selecton: {abs(mouseCol - mouseC)}x{abs(mouseRow-mouseR)} @ Dm: {drawMode}".encode()
         text_surface = font.render(text_string, True, (255, 255, 255))
-        screen.blit(text_surface, dest=(navi_left, 120))
+        screen.blit(text_surface, dest=(navi_left, 100))
+
+    text_string = f"Source dP: {source_power:.2f} [W/m]".encode()
+    text_surface = font.render(text_string, True, (255, 255, 255))
+    screen.blit(text_surface, dest=(navi_left, 120))
 
     for i, mat in enumerate(m_name):
         text_string = f"{i+1}: {mat}".encode()
