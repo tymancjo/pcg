@@ -102,6 +102,8 @@ selectedCells = []
 mouseR = mouseC = mouseCol = mouseRow = 0
 dKeyCount = 0  # used to count "Q" presses for reset
 nowIs = 0
+fieldDrawMode = 0
+filedName = "Delta T [K]"
 
 move_vector = [0, 0]
 move_frame = 0
@@ -271,12 +273,16 @@ while running:
                     if drawMode > 1:
                         drawMode = 0
                 else:
-                    if colorsT:
-                        dispVal = vV
-                        colorsT = False
-                    else:
-                        dispVal = T
-                        colorsT = True
+                    fieldDrawMode += 1
+                    if fieldDrawMode > 2:
+                        fieldDrawMode = 0
+
+                    # if colorsT:
+                    #     dispVal = vV
+                    #     colorsT = False
+                    # else:
+                    #     dispVal = T
+                    #     colorsT = True
 
             if event.key == pygame.K_z:
                 zoom += 1
@@ -495,12 +501,16 @@ while running:
             screen, (25, 25, 50), pygame.Rect(0, 0, screen_size0, screen_size0)
         )
 
-        if colorsT:
-            dispVal = vV[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
-            currentMax = dispVal.max()
-        else:
+        if fieldDrawMode == 0:
             dispVal = T[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
-            currentMax = dispVal.max()
+            filedName = "Delta T [K]"
+        elif fieldDrawMode == 1:
+            dispVal = vV[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+            filedName = "Velocity [m/s]"
+        elif fieldDrawMode == 2:
+            dispVal = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+            filedName = "Power Losses [W/m]"
+        currentMax = dispVal.max()
 
         # ################### #
         # handling scrolling: #
@@ -725,43 +735,60 @@ while running:
     simMin = math.floor((simTime - simH * 3600) / 60)
     simSec = math.floor(simTime - simH * 3600 - simMin * 60)
 
+    tT = 2
+    dT = 20
+
+    tN = 0
+
+    text_surface = font.render(filedName, True, (255, 255, 255))
+    screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
+
+    tN += 2
     text_string = f"{material} dT:{reading:.2f}K dP:{powerloss:.1f}W".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
-    screen.blit(text_surface, dest=(navi_left, 0))
+    screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
+    tN += 1
     text_string = f"maxT: {currentMax:.4f}K".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
-    screen.blit(text_surface, dest=(navi_left, 15))
+    screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
+    tN += 1
     text_string = f"time: {simH:02d}:{simMin:02d}:{simSec:02d}".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
-    screen.blit(text_surface, dest=(navi_left, 30))
+    screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
+    tN += 1
     text_string = f"s: {1000*s:.2f}mm / {N} // {maxNup}".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
-    screen.blit(text_surface, dest=(navi_left, 45))
+    screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
+    tN += 1
     text_string = f" Fr {frameRatio:.2f} vm: {viewMode}".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
-    screen.blit(text_surface, dest=(navi_left, 60))
+    screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
+    tN += 2
     text_string = f"Selected: {m_name[selected_material]}".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
-    screen.blit(text_surface, dest=(navi_left, 80))
+    screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
+    tN += 1
     if editMode:
         text_string = f"Selecton: {abs(mouseCol - mouseC)}x{abs(mouseRow-mouseR)} @ Dm: {drawMode}".encode()
         text_surface = font.render(text_string, True, (255, 255, 255))
-        screen.blit(text_surface, dest=(navi_left, 100))
+        screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
+    tN += 2
     text_string = f"Source dP: {source_power:.2f} [W/m]".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
-    screen.blit(text_surface, dest=(navi_left, 120))
+    screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
+    tN += 1
     for i, mat in enumerate(m_name):
         text_string = f"{i+1}: {mat}".encode()
         text_surface = font.render(text_string, True, (255, 255, 255))
-        screen.blit(text_surface, dest=(navi_left, 140 + 15 * i))
+        screen.blit(text_surface, dest=(navi_left, tT + (tN + i) * dT))
 
     ## Done after drawing everything to the screen
     pygame.display.flip()

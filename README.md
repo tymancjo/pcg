@@ -25,15 +25,17 @@ The solver basically solves the system in form of simulation - this means iterat
         # d - [in edit mode] toggle drawing mode from rectangle to paint mode
         # d - [in sim mode] toggle the result field [Temperature, Velocity]
         # z/x - zoom in and out
+        # arrow keys - moving canvas in zoom mode
         #
         # 1 .. 4 - [in edit mode] select the Nth material from database
         # 1 - [in sim mode] decrease the maxN value
         # 2 - [in sim mode] increase the maxN value
         #
-        # 7 - [in edit mode] increase selected cells power loss by 0.1
-        # 8 - [in edit mode] increase selected cells power loss by 1
-        # 9 - [in edit mode] increase selected cells power loss by 10
-        # 0 - [in edit mode] rester selected cells power loss to 0
+        # 7 - [in edit mode] increase (decrease with Shift) defined source power loss by 0.1
+        # 8 - [in edit mode] increase (decrease with Shift) defined source power loss by 1
+        # 9 - [in edit mode] increase (decrease with Shift) defined source power loss by 10
+        # 0 - [in edit mode] reset defined source power loss to 0
+        # ENTER - apply defined source dP value to selected cells
 
 # PCG V2 2D concept of work 
 
@@ -82,15 +84,14 @@ To do plan:
     - [ ] Shape drawing
         - [ ] Lines
         - [x] Boxes
-    - [ ] Source definition
-        - [ ] Set temperature
+    - [x] Source definition
         - [x] Set power generation
 
 - [ ] Visual stuff 
     - [x] Zoom
-    - [ ] Pan
+    - [x] Pan
         - [x] Manual pan
-        - [ ] Auto pan with pressed keys
+        - [x] Auto pan with pressed keys
     - [x] Display modes 
         - [x] Normal 
         - [x] Temperature
