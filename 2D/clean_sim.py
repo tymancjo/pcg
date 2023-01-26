@@ -25,13 +25,16 @@ cols = 60
 
 # display and pixel data
 pixelSize = int(min(1000 / cols, 1000 / rows))
-WIDTH = W0 = cols * pixelSize
-HEIGHT = rows * pixelSize
+W0 = cols * pixelSize
+H0 = rows * pixelSize
+WIDTH = HEIGHT = max(W0, H0)
 FPS = 500
 BLACK = (0, 0, 0)
+offset_pix_x = int((WIDTH - W0) / 2)
+offset_pix_y = int((HEIGHT - H0) / 2)
 
-pixelCellW = pW0 = int(WIDTH / cols)
-pixelCellH = pH0 = int(HEIGHT / rows)
+pixelCellW = pW0 = int(W0 / cols)
+pixelCellH = pH0 = int(H0 / rows)
 
 # some handy data fo the navi panel
 # Navi pane size
@@ -242,18 +245,20 @@ while running:
                     zoom = 4
 
                 if zoom > 1:
-                    pixelCellH *= 2
-                    pixelCellW *= 2
+                    # pixelCellH *= 2
+                    # pixelCellW *= 2
+                    pixelCellH = pH0 * zoom
+                    pixelCellW = pW0 * zoom
 
                     zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                    zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+                    zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
                 else:
                     pixelCellH = pH0
                     pixelCellW = pW0
                     zoom_left = 0
                     zoom_top = 0
                     zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                    zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+                    zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
 
             if event.key == pygame.K_x:
                 zoom -= 1
@@ -261,18 +266,20 @@ while running:
                     zoom = 1
 
                 if zoom > 1:
-                    pixelCellH *= 0.5
-                    pixelCellW *= 0.5
+                    # pixelCellH *= 0.5
+                    # pixelCellW *= 0.5
+                    pixelCellH = pH0 * zoom
+                    pixelCellW = pW0 * zoom
 
                     zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                    zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+                    zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
                 else:
                     pixelCellH = pH0
                     pixelCellW = pW0
                     zoom_left = 0
                     zoom_top = 0
                     zoom_right = zoom_left + math.floor(W0 / pixelCellW)
-                    zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+                    zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
 
             if event.key == pygame.K_LEFT:
                 zoom_left += 1
@@ -290,13 +297,13 @@ while running:
 
             if event.key == pygame.K_UP:
                 zoom_top += 1
-                zoom_top = min(zoom_top, T.shape[0] - math.floor(HEIGHT / pixelCellH))
+                zoom_top = min(zoom_top, T.shape[0] - math.floor(H0 / pixelCellH))
                 zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
 
             if event.key == pygame.K_DOWN:
                 zoom_top -= 1
                 zoom_top = max(0, zoom_top)
-                zoom_bottom = zoom_top + math.floor(HEIGHT / pixelCellH)
+                zoom_bottom = zoom_top + math.floor(H0 / pixelCellH)
 
             if event.key == pygame.K_1:
                 if editMode:
@@ -406,19 +413,26 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN:
 
             pos = pygame.mouse.get_pos()
+            mx, my = pos
 
-            if pos[0] < navi_start:
-                mouseRow = math.floor(pos[1] / pixelCellH)
-                mouseCol = math.floor(pos[0] / pixelCellW)
+            if mx < navi_start and (offset_pix_x <= mx and offset_pix_y <= my):
+                mx -= offset_pix_x
+                my -= offset_pix_y
+                mouseRow = math.floor(my / pixelCellH)
+                mouseCol = math.floor(mx / pixelCellW)
                 drawing = True
 
         if event.type == pygame.MOUSEMOTION:
 
             pos = pygame.mouse.get_pos()
+            mx, my = pos
 
-            if pos[0] < navi_start:
-                mouseR = math.floor(pos[1] / pixelCellH)
-                mouseC = math.floor(pos[0] / pixelCellW)
+            if mx < navi_start and (offset_pix_x <= mx and offset_pix_y <= my):
+                mx -= offset_pix_x
+                my -= offset_pix_y
+                mouseR = math.floor(my / pixelCellH)
+                mouseC = math.floor(mx / pixelCellW)
+                print(mouseC, mouseR)
 
                 if drawing:
                     # mouseRow, mouseCol = mouseR, mouseC
@@ -436,7 +450,8 @@ while running:
 
         if event.type == pygame.MOUSEBUTTONUP:
             pos = pygame.mouse.get_pos()
-            if pos[0] < navi_start:
+            mx, my = pos
+            if mx < navi_start and (offset_pix_x <= mx and offset_pix_y <= my):
                 drawing = False
                 if drawMode > 0:
                     selectedCells = [mouseCol, mouseRow, mouseC, mouseR]
@@ -465,8 +480,8 @@ while running:
         # drawing the colors of the temperatures
         for r in range(rows):
             for c in range(cols):
-                pos_x = pixelCellW * c
-                pos_y = pixelCellH * r
+                pos_x = pixelCellW * c + offset_pix_x
+                pos_y = pixelCellH * r + offset_pix_y
 
                 if m_gas[thisID[r, c]] or viewMode == 2:
                     # avT = T[r, c - 1 : c + 2].sum() / 3
@@ -502,10 +517,10 @@ while running:
                 # taking care of the edit drawings
                 if drawMode == 1:
                     # rectangle stuff
-                    Xs = mouseCol * pixelCellW
-                    Ys = mouseRow * pixelCellH
-                    Xe = mouseC * pixelCellW
-                    Ye = mouseR * pixelCellH
+                    Xs = mouseCol * pixelCellW + offset_pix_x
+                    Ys = mouseRow * pixelCellH + offset_pix_y
+                    Xe = mouseC * pixelCellW + offset_pix_x
+                    Ye = mouseR * pixelCellH + offset_pix_y
 
                     for POS in [
                         (Xs, Ys, Xe, Ys),
@@ -521,10 +536,10 @@ while running:
                         )
             elif selectedCells and drawMode == 1:
                 # rectangle stuff
-                Xs = selectedCells[0] * pixelCellW
-                Ys = selectedCells[1] * pixelCellH
-                Xe = selectedCells[2] * pixelCellW
-                Ye = selectedCells[3] * pixelCellH
+                Xs = selectedCells[0] * pixelCellW + offset_pix_x
+                Ys = selectedCells[1] * pixelCellH + offset_pix_y
+                Xe = selectedCells[2] * pixelCellW + offset_pix_x
+                Ye = selectedCells[3] * pixelCellH + offset_pix_y
 
                 for POS in [
                     (Xs, Ys, Xe, Ys),
