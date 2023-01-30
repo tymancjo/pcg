@@ -661,7 +661,7 @@ while running:
     if not editMode:
         if True:
 
-            vV[:, :] = 0  # clearing the velocity vector
+            vV = np.zeros(T.shape)  # clearing the velocity vector
             ######
             pcg.solve_cond_with_v(T, dP, vV, m_ID, m_massCp, m_Rth, m_gas, dx, dt, g)
             ######
