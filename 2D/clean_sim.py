@@ -2,10 +2,10 @@ import pygame
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.misc
 
 import pcg_v2 as pcg
 import materials as mt
+import cmap as cc
 
 
 # material database for the solver
@@ -106,7 +106,7 @@ dKeyCount = 0  # used to count "Q" presses for reset
 nowIs = 0
 fieldDrawMode = 0
 filedName = "Delta T [K]"
-fast_display = False
+fast_display = 0
 
 move_vector = [0, 0]
 move_frame = 0
@@ -119,11 +119,7 @@ material = m_name[selected_material]
 source_power = 0
 
 # vectorization of functions
-
-vect_color_R = np.vectorize(pcg.getColorAsArrayR)
-vect_color_G = np.vectorize(pcg.getColorAsArrayG)
-vect_color_B = np.vectorize(pcg.getColorAsArrayB)
-
+CLRS = np.array(cc.cmap)
 
 ## initialize pygame and create window
 pygame.init()
@@ -213,7 +209,9 @@ while running:
                     viewMode = 0
 
             if event.key == pygame.K_f:
-                fast_display = not fast_display
+                fast_display += 1
+                if fast_display > 2:
+                    fast_display = 0
 
             if event.key == pygame.K_p:
                 if editMode:
@@ -506,7 +504,7 @@ while running:
     # 3Draw/render step count - to not draw each calculation step
     makeStep += 1
 
-    if makeStep > (stepsToDraw * (1 + 9 * fast_display)) or editMode:
+    if makeStep > (stepsToDraw) or editMode:
         makeStep = 0
 
         # cleaning the screen
@@ -556,22 +554,22 @@ while running:
         offset_pix_x = int((screen_size0 - pixelCellW * cols) / 2)
         offset_pix_y = int((screen_size0 - pixelCellH * rows) / 2)
 
-        if fast_display:
+        if fast_display > 0:
             # alternative way of main field plotting - try if this might be more efficient.
             # Idea - prepare a np array of colors and blit it to screen
-            #
-            # R_to_blit = np.vectorize(pcg.testFunction, dispVal.astype(float))
-            # R_to_blit = dispVal / dispVal.max()
-            # vect_Color_function = np.vectorize(pcg.testFunction)
-            normalizer_dispVal = 1 - (dispVal.T / (dispVal.max() + 1e-15))
+            if fast_display == 1:
 
-            # R_to_blit = vect_color_R(normalizer_dispVal)
-            # G_to_blit = vect_color_G(normalizer_dispVal)
-            # B_to_blit = vect_color_B(normalizer_dispVal)
-
-            R_to_blit = normalizer_dispVal * 255
-            G_to_blit = normalizer_dispVal * 255
-            B_to_blit = normalizer_dispVal * 255
+                normalizer_dispVal = (255 * dispVal.T / (dispVal.max() + 1e-15)).astype(
+                    np.int16
+                )
+                R_to_blit = CLRS[normalizer_dispVal, 0]
+                G_to_blit = CLRS[normalizer_dispVal, 1]
+                B_to_blit = CLRS[normalizer_dispVal, 2]
+            else:
+                normalizer_dispVal = 1 - (dispVal.T / (dispVal.max() + 1e-15))
+                R_to_blit = normalizer_dispVal * 255
+                G_to_blit = normalizer_dispVal * 255
+                B_to_blit = normalizer_dispVal * 255
 
             RGB_to_blit = np.dstack([R_to_blit, G_to_blit, B_to_blit])
             RGB_to_blit = pygame.surfarray.make_surface(RGB_to_blit)
@@ -802,7 +800,9 @@ while running:
     screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
     tN += 1
-    text_string = f" Fr {frameRatio:.2f} vm: {viewMode} fps: {clock.get_fps()}".encode()
+    text_string = (
+        f" Fr {frameRatio:.2f} vm: {viewMode} fps: {int(clock.get_fps())}".encode()
+    )
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 

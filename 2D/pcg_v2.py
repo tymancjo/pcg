@@ -4,6 +4,8 @@ import pickle
 import numpy as np
 from numba import njit
 
+CLRS = np.array(cc.cmap)
+
 
 class dataKeeper:
     def __init__(self, dataList):
@@ -101,18 +103,21 @@ def getColor(A, minimum=0, maximum=200):
 
 
 def getColorAsArrayR(A):
-    c = 0
-    return cc.cmap[max(0, min(int(A * 255), 255))][c]
+    return CLRS[max(0, min(int(A * 255), 255)), 0]
+    # c = 0
+    # return cc.cmap[max(0, min(int(A * 255), 255))][c]
 
 
 def getColorAsArrayG(A):
-    c = 1
-    return cc.cmap[max(0, min(int(A * 255), 255))][c]
+    return CLRS[max(0, min(int(A * 255), 255)), 1]
+    # c = 1
+    # return cc.cmap[max(0, min(int(A * 255), 255))][c]
 
 
 def getColorAsArrayB(A):
-    c = 2
-    return cc.cmap[max(0, min(int(A * 255), 255))][c]
+    return CLRS[max(0, min(int(A * 255), 255)), 2]
+    # c = 2
+    # return cc.cmap[max(0, min(int(A * 255), 255))][c]
 
 
 # the plan for a faster solution compatible with numba
