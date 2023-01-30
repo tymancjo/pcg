@@ -2,6 +2,7 @@ import pygame
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.misc
 
 import pcg_v2 as pcg
 import materials as mt
@@ -28,7 +29,7 @@ pixelSize = int(min(1000 / cols, 1000 / rows))
 W0 = cols * pixelSize
 H0 = rows * pixelSize
 WIDTH = HEIGHT = max(W0, H0)
-FPS = 500
+FPS = 2000
 BLACK = (0, 0, 0)
 offset_pix_x = int((WIDTH - W0) / 2)
 offset_pix_y = int((HEIGHT - H0) / 2)
@@ -37,6 +38,7 @@ pixelCellW = pW0 = int(W0 / cols)
 pixelCellH = pH0 = int(H0 / rows)
 
 screen_size0 = max(W0, H0)
+grid_size = int(screen_size0 / pixelSize)
 
 # some handy data fo the navi panel
 # Navi pane size
@@ -88,7 +90,7 @@ zoom_bottom = rows
 
 drawMode = 1
 viewMode = 0
-stepsToDraw = 10
+stepsToDraw = 1
 simTime = 0
 maxNup = 6
 makeStep = 100
@@ -104,6 +106,7 @@ dKeyCount = 0  # used to count "Q" presses for reset
 nowIs = 0
 fieldDrawMode = 0
 filedName = "Delta T [K]"
+fast_display = False
 
 move_vector = [0, 0]
 move_frame = 0
@@ -114,6 +117,12 @@ reading = 0
 powerloss = 0
 material = m_name[selected_material]
 source_power = 0
+
+# vectorization of functions
+
+vect_color_R = np.vectorize(pcg.getColorAsArrayR)
+vect_color_G = np.vectorize(pcg.getColorAsArrayG)
+vect_color_B = np.vectorize(pcg.getColorAsArrayB)
 
 
 ## initialize pygame and create window
@@ -141,6 +150,7 @@ while running:
         # space - simulation/edit mode toggle
         # g - turn on/off gravity
         # v - cycle over view modes - result field with shapes, materials, just result field
+        # f - cycle over normal and fast (grayscale) field display mode
         # p - [in edit mode] plots the temperature plot
         # w = [in edit mode] save the simulation data - will ask about filename in terminal
         # l - [in edit mode] loads the simulation data - will ask about filename in terminal
@@ -202,6 +212,9 @@ while running:
                 if viewMode > 2:
                     viewMode = 0
 
+            if event.key == pygame.K_f:
+                fast_display = not fast_display
+
             if event.key == pygame.K_p:
                 if editMode:
                     plt.plot(timeV, maxTV)
@@ -252,7 +265,7 @@ while running:
                         simTime = timeV[-1]
 
                         # just hacking the steel color:
-                        # m_colors[1] = (25, 25, 25)
+                        m_colors[1] = (25, 25, 25)
                         zoom = 1
                         zoom_left = zoom_top = 0
                         zoom_right = zoom_bottom = grid_size
@@ -310,7 +323,7 @@ while running:
                     if zoom_top >= zoom_bottom:
                         zoom_top = max(0, zoom_bottom - maxCellsRows)
 
-                print(f"zoom top {zoom_top, zoom_bottom}, left {zoom_left,zoom_right}")
+                # print(f"zoom top {zoom_top, zoom_bottom}, left {zoom_left,zoom_right}")
 
             if event.key == pygame.K_x:
                 zoom -= 1
@@ -337,7 +350,7 @@ while running:
                     if zoom_top >= zoom_bottom:
                         zoom_top = max(0, zoom_bottom - maxCellsRows)
 
-                print(f"zoom top {zoom_top, zoom_bottom}, left {zoom_left,zoom_right}")
+                # print(f"zoom top {zoom_top, zoom_bottom}, left {zoom_left,zoom_right}")
 
             if event.key == pygame.K_LEFT:
                 move_vector[0] = -1
@@ -466,7 +479,7 @@ while running:
                 my -= offset_pix_y
                 mouseR = math.floor(my / pixelCellH)
                 mouseC = math.floor(mx / pixelCellW)
-                print(mouseC, mouseR)
+                # print(mouseC, mouseR)
 
                 if drawing:
                     # mouseRow, mouseCol = mouseR, mouseC
@@ -493,7 +506,7 @@ while running:
     # 3Draw/render step count - to not draw each calculation step
     makeStep += 1
 
-    if makeStep > stepsToDraw or editMode:
+    if makeStep > (stepsToDraw * (1 + 9 * fast_display)) or editMode:
         makeStep = 0
 
         # cleaning the screen
@@ -543,40 +556,65 @@ while running:
         offset_pix_x = int((screen_size0 - pixelCellW * cols) / 2)
         offset_pix_y = int((screen_size0 - pixelCellH * rows) / 2)
 
-        # drawing the colors of the temperatures
-        for r in range(rows):
-            for c in range(cols):
-                pos_x = pixelCellW * c + offset_pix_x
-                pos_y = pixelCellH * r + offset_pix_y
+        if fast_display:
+            # alternative way of main field plotting - try if this might be more efficient.
+            # Idea - prepare a np array of colors and blit it to screen
+            #
+            # R_to_blit = np.vectorize(pcg.testFunction, dispVal.astype(float))
+            # R_to_blit = dispVal / dispVal.max()
+            # vect_Color_function = np.vectorize(pcg.testFunction)
+            normalizer_dispVal = 1 - (dispVal.T / (dispVal.max() + 1e-15))
 
-                if m_gas[thisID[r, c]] or viewMode == 2:
-                    # avT = T[r, c - 1 : c + 2].sum() / 3
-                    # color = pcg.getColor(avT, 0, currentMax)
-                    color = pcg.getColor(dispVal[r, c], 0, currentMax)
-                    if viewMode == 1:
-                        color = m_colors[thisID[r, c]]
+            # R_to_blit = vect_color_R(normalizer_dispVal)
+            # G_to_blit = vect_color_G(normalizer_dispVal)
+            # B_to_blit = vect_color_B(normalizer_dispVal)
 
-                    pygame.draw.rect(
-                        screen,
-                        color,
-                        pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
-                    )
-                else:
+            R_to_blit = normalizer_dispVal * 255
+            G_to_blit = normalizer_dispVal * 255
+            B_to_blit = normalizer_dispVal * 255
 
-                    color = pcg.getColor(dispVal[r, c], 0, currentMax)
-                    pygame.draw.rect(
-                        screen,
-                        m_colors[thisID[r, c]],
-                        pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
-                    )
-                    if viewMode != 1:
+            RGB_to_blit = np.dstack([R_to_blit, G_to_blit, B_to_blit])
+            RGB_to_blit = pygame.surfarray.make_surface(RGB_to_blit)
+            RGB_to_blit = pygame.transform.scale(
+                RGB_to_blit, (cols * pixelCellW, rows * pixelCellH)
+            )
+            screen.blit(RGB_to_blit, dest=(offset_pix_x, offset_pix_y))
+
+        else:
+            # drawing the colors of the temperatures
+            for r in range(rows):
+                for c in range(cols):
+                    pos_x = pixelCellW * c + offset_pix_x
+                    pos_y = pixelCellH * r + offset_pix_y
+
+                    if m_gas[thisID[r, c]] or viewMode == 2:
+                        # avT = T[r, c - 1 : c + 2].sum() / 3
+                        # color = pcg.getColor(avT, 0, currentMax)
+                        color = pcg.getColor(dispVal[r, c], 0, currentMax)
+                        if viewMode == 1:
+                            color = m_colors[thisID[r, c]]
+
                         pygame.draw.rect(
                             screen,
                             color,
-                            pygame.Rect(
-                                pos_x + 1, pos_y + 1, pixelCellW - 2, pixelCellH - 2
-                            ),
+                            pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
                         )
+                    else:
+
+                        color = pcg.getColor(dispVal[r, c], 0, currentMax)
+                        pygame.draw.rect(
+                            screen,
+                            m_colors[thisID[r, c]],
+                            pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
+                        )
+                        if viewMode != 1:
+                            pygame.draw.rect(
+                                screen,
+                                color,
+                                pygame.Rect(
+                                    pos_x + 1, pos_y + 1, pixelCellW - 2, pixelCellH - 2
+                                ),
+                            )
 
         if editMode:
             if drawing:
@@ -764,7 +802,7 @@ while running:
     screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
     tN += 1
-    text_string = f" Fr {frameRatio:.2f} vm: {viewMode}".encode()
+    text_string = f" Fr {frameRatio:.2f} vm: {viewMode} fps: {clock.get_fps()}".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 

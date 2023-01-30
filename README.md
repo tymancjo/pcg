@@ -18,6 +18,7 @@ The solver basically solves the system in form of simulation - this means iterat
         # space - simulation/edit mode toggle
         # g - turn on/off gravity
         # v - cycle over view modes - result field with shapes, materials, just result field
+        # f - cycle over normal and fast (grayscale) field display mode
         # p - [in edit mode] plots the temperature plot
         # w = [in edit mode] save the simulation data - will ask about filename in terminal
         # l - [in edit mode] loads the simulation data - will ask about filename in terminal

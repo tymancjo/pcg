@@ -100,6 +100,21 @@ def getColor(A, minimum=0, maximum=200):
     return cc.cmap[0]
 
 
+def getColorAsArrayR(A):
+    c = 0
+    return cc.cmap[max(0, min(int(A * 255), 255))][c]
+
+
+def getColorAsArrayG(A):
+    c = 1
+    return cc.cmap[max(0, min(int(A * 255), 255))][c]
+
+
+def getColorAsArrayB(A):
+    c = 2
+    return cc.cmap[max(0, min(int(A * 255), 255))][c]
+
+
 # the plan for a faster solution compatible with numba
 #
 # not use the objects, but define the separate matrices (arrays) for the values
