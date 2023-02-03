@@ -558,7 +558,7 @@ while running:
             # alternative way of main field plotting - try if this might be more efficient.
             # Idea - prepare a np array of colors and blit it to screen
             if fast_display == 1:
-
+                # the full colormap
                 normalizer_dispVal = (255 * dispVal.T / (dispVal.max() + 1e-15)).astype(
                     np.int16
                 )
@@ -566,6 +566,7 @@ while running:
                 G_to_blit = CLRS[normalizer_dispVal, 1]
                 B_to_blit = CLRS[normalizer_dispVal, 2]
             else:
+                # the BW version
                 normalizer_dispVal = 1 - (dispVal.T / (dispVal.max() + 1e-15))
                 R_to_blit = normalizer_dispVal * 255
                 G_to_blit = normalizer_dispVal * 255

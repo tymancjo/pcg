@@ -88,7 +88,7 @@ To do plan:
     - [x] Source definition
         - [x] Set power generation
 
-- [ ] Visual stuff 
+- [x] Visual stuff 
     - [x] Zoom
     - [x] Pan
         - [x] Manual pan
@@ -97,10 +97,22 @@ To do plan:
         - [x] Normal 
         - [x] Temperature
         - [x] Materials
-    - [ ] Result field selection
+    - [x] Result field selection
         - [x] Temperatures 
         - [x] Velocities 
         - [x] Power Losses
+
+- [ ] Import external data
+    - [ ] Data from CSD
+    - [ ] Geometry from picture
+
+- [ ] Improve on solutions
+    - [ ] Trim analysis area
+        - [ ] Just trim the domain
+        - [ ] Limit the solution to the selected part
+
+- [ ] Edit features
+    - [ ] Copy/Paste data in the domain
 
 
 ## Engine expansion ideas
@@ -109,4 +121,19 @@ To do plan:
     - set the maxN loops based on the max s / or max velocity 
     - do the convection looping 
         - each cell move up only as many time as the individual need
+
+### 3D modeling and simulation in the - model of slices /mos/
+
+The idea:
+Single slice of is just a 2D analysis - as it is working nice already. 
+To make it 3D -> let's just put the 3D together made out of slices. 
+
+- [ ] Simulation
+    - [ ] Stuck slices and make them transport heat only by conduction
+    - [ ] ad another dimension to convection
+    
+- [ ] Display
+    - [ ] Select displayed slice and show it as it is now (2D)
+
+
 

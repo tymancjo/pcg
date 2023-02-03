@@ -225,6 +225,14 @@ def solve_cond_with_v(
                 v_array[r, c] = 0
 
 
+def solve_conv_3d():
+    # how to make it?
+    # it's need to be made out of full 3D arrays - thats it ....
+    # lot of work... but should be fun :)
+
+    pass
+
+
 @njit
 def solve_conv(T_array, m_ID, vV, gas_array, dx, N=1, dt=1 / 100):
 
