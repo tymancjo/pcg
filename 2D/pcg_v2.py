@@ -137,6 +137,7 @@ def pre_processor(the_grid):
     # initially just for convenience to get the shape right
     grid_as_array = np.array(the_grid)
     the_shape = grid_as_array.shape
+    the_shape = (the_shape[0], the_shape[1], 1)
 
     # now let's make the required arrays of values.
     T_array = np.zeros(the_shape)
@@ -152,6 +153,19 @@ def pre_processor(the_grid):
             material_ID[r, c] = int(cell.ID)
 
     return T_array, dP_array, material_ID.astype(int), s_array  # , gas_array
+
+
+def add_slice(T, dP, vV, m_ID, this_slice):
+    """
+    adding another layer in 3D to the solution arrays, by copy the last slice.
+    returning the same set of arrays but now in 3d d- dimension (rows,cols,depth)
+    """
+    T = np.dstack([T, np.copy(T[:, :, this_slice])])
+    dP = np.dstack([dP, np.copy(dP[:, :, this_slice])])
+    vV = np.dstack([vV, np.copy(vV[:, :, this_slice])])
+    m_ID = np.dstack([m_ID, np.copy(m_ID[:, :, this_slice])])
+
+    return T, dP, vV, m_ID
 
 
 @njit
@@ -223,6 +237,80 @@ def solve_cond_with_v(
                 v_array[r, c] += g * (((T_array[r, c] + 35) / 35) - 1) * dt
             else:
                 v_array[r, c] = 0
+
+
+@njit
+def solve_3d_cond_with_v(
+    T_array: np.array,
+    dP_array: np.array,
+    v_array: np.array,
+    m_ID: np.array,
+    massCp_array: np.array,
+    Rth_array: np.array,
+    gas_array: np.array,
+    dx,
+    dt=1 / 100,
+    g=9.81,
+):
+    # T, dP, m_ID, m_massCp, m_Rth, dt
+    # checking if we got the arrays in 3D
+    if T_array.ndim > 2:
+        rows, cols, slices = T_array.shape
+    else:
+        rows, cols = T_array.shape
+        slices = 1
+
+    for s in range(slices):
+        for r in range(1, rows - 1):
+            for c in range(1, cols - 1):
+                # heat generation temp rise
+                T_array[r, c, s] += dP_array[r, c, s] * dt / massCp_array[m_ID[r, c, s]]
+
+                # Thermal conduction
+                # to the left
+                DT = T_array[r, c, s] - T_array[r, c - 1, s]
+                heatSigma = 1 / (
+                    Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r, c - 1, s]]
+                )
+                dP = DT * heatSigma
+                dQ = dP * dt
+                T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
+                T_array[r, c - 1, s] += dQ / massCp_array[m_ID[r, c - 1, s]]
+
+                # to the right
+                DT = T_array[r, c, s] - T_array[r, c + 1, s]
+                heatSigma = 1 / (
+                    Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r, c + 1, s]]
+                )
+                dP = DT * heatSigma
+                dQ = dP * dt
+                T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
+                T_array[r, c + 1, s] += dQ / massCp_array[m_ID[r, c + 1, s]]
+
+                # to the top
+                DT = T_array[r, c, s] - T_array[r - 1, c, s]
+                heatSigma = 1 / (
+                    Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r - 1, c, s]]
+                )
+                dP = DT * heatSigma
+                dQ = dP * dt
+                T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
+                T_array[r - 1, c, s] += dQ / massCp_array[m_ID[r - 1, c, s]]
+
+                # to the bottom
+                DT = T_array[r, c, s] - T_array[r + 1, c, s]
+                heatSigma = 1 / (
+                    Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r + 1, c, s]]
+                )
+                dP = DT * heatSigma
+                dQ = dP * dt
+                T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
+                T_array[r + 1, c, s] += dQ / massCp_array[m_ID[r + 1, c, s]]
+
+                if gas_array[m_ID[r, c, s]]:
+                    v_array[r, c, s] += g * (((T_array[r, c, s] + 35) / 35) - 1) * dt
+                else:
+                    v_array[r, c, s] = 0
 
 
 def solve_conv_3d():
@@ -328,11 +416,16 @@ def solve_conv(T_array, m_ID, vV, gas_array, dx, N=1, dt=1 / 100):
 
 
 def open_air_boundary(T_array, vV):
-    rows, cols = T_array.shape
 
-    T_array[0, :] *= 0.25
-    T_array[-1, :] = 0
-    T_array[:, 0] = 0
-    T_array[:, -1] = 0
-
-    vV[0, :] = 0
+    if T_array.ndim > 2:
+        T_array[0, :, :] *= 0.25
+        T_array[-1, :, :] = 0
+        T_array[:, 0, :] = 0
+        T_array[:, -1, :] = 0
+        vV[0, :, :] = 0
+    else:
+        T_array[0, :] *= 0.25
+        T_array[-1, :] = 0
+        T_array[:, 0] = 0
+        T_array[:, -1] = 0
+        vV[0, :] = 0
