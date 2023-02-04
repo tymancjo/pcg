@@ -163,7 +163,7 @@ def add_slice(T, dP, vV, m_ID, this_slice):
     T = np.dstack([T, np.copy(T[:, :, this_slice])])
     dP = np.dstack([dP, np.copy(dP[:, :, this_slice])])
     vV = np.dstack([vV, np.copy(vV[:, :, this_slice])])
-    m_ID = np.dstack([m_ID, np.copy(m_ID[:, :, this_slice])])
+    m_ID = np.dstack([m_ID, np.copy(m_ID[:, :, this_slice])]).astype(int)
 
     return T, dP, vV, m_ID
 
@@ -307,18 +307,21 @@ def solve_3d_cond_with_v(
                 T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
                 T_array[r + 1, c, s] += dQ / massCp_array[m_ID[r + 1, c, s]]
 
+                # to next slice (it this is not the last one)
+                if s < slices - 1:
+                    DT = T_array[r, c, s] - T_array[r, c, s + 1]
+                    heatSigma = 1 / (
+                        Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r, c, s + 1]]
+                    )
+                    dP = DT * heatSigma
+                    dQ = dP * dt
+                    T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
+                    T_array[r, c, s + 1] += dQ / massCp_array[m_ID[r, c, s + 1]]
+
                 if gas_array[m_ID[r, c, s]]:
                     v_array[r, c, s] += g * (((T_array[r, c, s] + 35) / 35) - 1) * dt
                 else:
                     v_array[r, c, s] = 0
-
-
-def solve_conv_3d():
-    # how to make it?
-    # it's need to be made out of full 3D arrays - thats it ....
-    # lot of work... but should be fun :)
-
-    pass
 
 
 @njit
@@ -413,6 +416,163 @@ def solve_conv(T_array, m_ID, vV, gas_array, dx, N=1, dt=1 / 100):
                                 vV[r, c + 1],
                             )
                             # vV[r, c] = 0
+
+
+@njit
+def solve_3d_conv(T_array, m_ID, vV, gas_array, dx, N=1, dt=1 / 100):
+
+    rows, cols, slices = T_array.shape
+
+    for n in range(N):
+        this_s = n * dx
+
+        for s in range(slices):
+            for r in range(1, rows - 1):
+                for c in range(1, cols - 1):
+                    S = vV[r, c, s] * dt
+                    if S >= this_s:
+
+                        if gas_array[m_ID[r, c, s]] and (
+                            T_array[r, c, s] > T_array[r, c - 1, s]
+                            or T_array[r, c + 1, s]
+                        ):
+                            # if this is a gas cell and it's hotter then the adjacted ones (L or R) in this slice
+                            # up
+                            if (T_array[r, c, s] > T_array[r - 1, c, s]) and m_ID[
+                                r, c, s
+                            ] == m_ID[r - 1, c, s]:
+                                T_array[r - 1, c, s], T_array[r, c, s] = (
+                                    T_array[r, c, s],
+                                    T_array[r - 1, c, s],
+                                )
+                                vV[r - 1, c, s], vV[r, c, s] = (
+                                    vV[r, c, s],
+                                    vV[r - 1, c, s],
+                                )
+
+                            # up-left
+                            elif (
+                                T_array[r, c, s] > T_array[r - 1, c - 1, s]
+                                and m_ID[r, c, s] == m_ID[r - 1, c - 1, s]
+                            ):
+                                T_array[r - 1, c - 1, s], T_array[r, c, s] = (
+                                    T_array[r, c, s],
+                                    T_array[r - 1, c - 1, s],
+                                )
+                                vV[r - 1, c - 1, s], vV[r, c, s] = (
+                                    vV[r, c, s],
+                                    vV[r - 1, c - 1, s],
+                                )
+                                # vV[r, c] = 0
+                            # up-right
+                            elif (
+                                T_array[r, c, s] > T_array[r - 1, c + 1, s]
+                                and m_ID[r, c, s] == m_ID[r - 1, c + 1, s]
+                            ):
+                                T_array[r - 1, c + 1, s], T_array[r, c, s] = (
+                                    T_array[r, c, s],
+                                    T_array[r - 1, c + 1, s],
+                                )
+                                vV[r - 1, c + 1, s], vV[r, c, s] = (
+                                    vV[r, c, s],
+                                    vV[r - 1, c + 1, s],
+                                )
+                                # vV[r, c] = 0
+
+                            ##### 3D
+                            # Up next slice
+                            elif (
+                                T_array[r, c, s] > T_array[r - 1, c, s + 1]
+                                and m_ID[r, c, s] == m_ID[r - 1, c, s + 1]
+                                and s < slices - 1
+                            ):
+                                T_array[r - 1, c, s + 1], T_array[r, c, s] = (
+                                    T_array[r, c, s],
+                                    T_array[r - 1, c, s + 1],
+                                )
+
+                                vV[r - 1, c, s + 1], vV[r, c, s] = (
+                                    vV[r, c, s],
+                                    vV[r - 1, c, s + 1],
+                                )
+
+                            # up previous slice
+                            elif (
+                                T_array[r, c, s] > T_array[r - 1, c, s - 1]
+                                and m_ID[r, c, s] == m_ID[r - 1, c, s - 1]
+                                and s > 0
+                            ):
+                                T_array[r - 1, c, s - 1], T_array[r, c, s] = (
+                                    T_array[r, c, s],
+                                    T_array[r - 1, c, s - 1],
+                                )
+
+                                vV[r - 1, c, s - 1], vV[r, c, s] = (
+                                    vV[r, c, s],
+                                    vV[r - 1, c, s - 1],
+                                )
+                            ##### end of the 3D depth moves
+
+                            # -left
+                            elif (
+                                T_array[r, c, s] > T_array[r, c - 1, s]
+                                and m_ID[r, c, s] == m_ID[r, c - 1, s]
+                            ):
+                                T_array[r, c - 1, s], T_array[r, c, s] = (
+                                    T_array[r, c, s],
+                                    T_array[r, c - 1, s],
+                                )
+                                vV[r, c - 1, s], vV[r, c, s] = (
+                                    vV[r, c, s],
+                                    vV[r, c - 1, s],
+                                )
+                                # vV[r, c] = 0
+                            # -right
+                            elif (
+                                T_array[r, c, s] > T_array[r, c + 1, s]
+                                and m_ID[r, c, s] == m_ID[r, c + 1, s]
+                            ):
+                                T_array[r, c + 1, s], T_array[r, c, s] = (
+                                    T_array[r, c, s],
+                                    T_array[r, c + 1, s],
+                                )
+                                vV[r, c + 1, s], vV[r, c, s] = (
+                                    vV[r, c, s],
+                                    vV[r, c + 1, s],
+                                )
+                                # vV[r, c] = 0
+
+                            # next slice
+                            elif (
+                                T_array[r, c, s] > T_array[r, c, s + 1]
+                                and m_ID[r, c, s] == m_ID[r, c, s + 1]
+                                and s < slices - 1
+                            ):
+                                T_array[r, c, s + 1], T_array[r, c, s] = (
+                                    T_array[r, c, s],
+                                    T_array[r, c, s + 1],
+                                )
+
+                                vV[r, c, s + 1], vV[r, c, s] = (
+                                    vV[r, c, s],
+                                    vV[r, c, s + 1],
+                                )
+
+                            # previous slice
+                            elif (
+                                T_array[r, c, s] > T_array[r, c, s - 1]
+                                and m_ID[r, c, s] == m_ID[r, c, s - 1]
+                                and s > 0
+                            ):
+                                T_array[r, c, s - 1], T_array[r, c, s] = (
+                                    T_array[r, c, s],
+                                    T_array[r, c, s - 1],
+                                )
+
+                                vV[r, c, s - 1], vV[r, c, s] = (
+                                    vV[r, c, s],
+                                    vV[r, c, s - 1],
+                                )
 
 
 def open_air_boundary(T_array, vV):

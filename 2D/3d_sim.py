@@ -771,7 +771,10 @@ while running:
             s = vV.max() * dt
 
         if s > 0:
-            # pcg.solve_conv(T, m_ID, vV, m_gas, dx, N, dt)
+            if T.ndim < 3:
+                pcg.solve_conv(T, m_ID, vV, m_gas, dx, N, dt)
+            else:
+                pcg.solve_3d_conv(T, m_ID, vV, m_gas, dx, N, dt)
 
             if s > dx / 2:
                 N = math.floor(s / dx) + 1
