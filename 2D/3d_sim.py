@@ -109,6 +109,7 @@ nowIs = 0
 fieldDrawMode = 0
 filedName = "Delta T [K]"
 fast_display = 0
+front_display = False
 
 move_vector = [0, 0]
 move_frame = 0
@@ -123,24 +124,24 @@ source_power = 0
 # vectorization of functions
 CLRS = np.array(cc.cmap)
 
-## initialize pygame and create window
+# initialize pygame and create window
 pygame.init()
-pygame.mixer.init()  ## For sound
+pygame.mixer.init()  # For sound
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Particle Cell Grid")
-clock = pygame.time.Clock()  ## For syncing the FPS
+clock = pygame.time.Clock()  # For syncing the FPS
 font = pygame.font.Font(pygame.font.get_default_font(), 12)
 
 
-## Simulation animation main loop
+# Simulation animation main loop
 running = True
 
 while running:
     # 1 Process input/events
-    clock.tick(FPS)  ## will make the loop run at the same speed all the time
+    clock.tick(FPS)  # will make the loop run at the same speed all the time
     for event in pygame.event.get():
         # gets all the events which have occurred till now and keeps tab of them.
-        ## listening for the the X button at the top
+        # listening for the the X button at the top
         if event.type == pygame.QUIT:
             running = False
 
@@ -209,7 +210,16 @@ while running:
                 this_slice = max(0, this_slice)
 
             if event.key == pygame.K_s:
-                T, dP, vV, m_ID = pcg.add_slice(T, dP, vV, m_ID, this_slice)
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_SHIFT:
+                    front_display = not front_display
+                    if front_display:
+                        front_display_row = min(mouseCol, mouseC)
+                else:
+                    T, dP, vV, m_ID = pcg.add_slice(T, dP, vV, m_ID, this_slice)
+
+            if event.key == pygame.K_c:
+                pass
 
             if event.key == pygame.K_g:
                 if g:
@@ -275,6 +285,10 @@ while running:
                             maxTV,
                         ) = dane.get_data()
                         simTime = timeV[-1]
+                        if T.ndim > 2:
+                            number_of_slices = T.shape[2]
+                        else:
+                            number_of_slices = 1
 
                         # just hacking the steel color:
                         m_colors[1] = (25, 25, 25)
@@ -560,7 +574,10 @@ while running:
             this_dP = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:, this_slice]
 
         rows, cols = dispVal.shape
-        currentMax = dispVal.max()
+        if fieldDrawMode:
+            currentMax = dispVal.max()
+        else:
+            currentMax = T.max()
 
         # ################### #
         # handling scrolling: #
@@ -685,6 +702,32 @@ while running:
                                         pixelCellH - 2,
                                     ),
                                 )
+        if front_display and T.ndim > 2:
+            # let's show the front back xcut of the system
+
+            front_display_array = T[:, front_display_row, :]
+            normalized_front_display_array = (
+                255 * front_display_array.T / (T.max() + 1e-15)
+            ).astype(np.int16)
+
+            R_to_blit = CLRS[normalized_front_display_array, 0]
+            G_to_blit = CLRS[normalized_front_display_array, 1]
+            B_to_blit = CLRS[normalized_front_display_array, 2]
+
+            RGB_to_blit = np.dstack([R_to_blit, G_to_blit, B_to_blit])
+            RGB_to_blit = pygame.surfarray.make_surface(RGB_to_blit)
+            RGB_to_blit = pygame.transform.scale(
+                RGB_to_blit, (10 * number_of_slices * pixelCellW, rows * pixelCellH)
+            )
+            screen.blit(RGB_to_blit, dest=(0, 0))
+
+            hW = int(pixelCellW / 2) * 10
+
+            pygame.draw.rect(
+                screen,
+                (255, 255, 255),
+                pygame.Rect(this_slice * 10 * pixelCellW + hW, 3, 1, rows * pixelCellH),
+            )
 
         if editMode:
             if drawing:
@@ -915,12 +958,13 @@ while running:
         tN += 1
 
     tN += 2
-    text_string = f"Slice: {this_slice} of {number_of_slices}".encode()
+    text_string = f"Slice: {this_slice+1} of {number_of_slices}".encode()
     text_surface = font.render(text_string, True, (255, 255, 255))
     screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
 
-    ## Done after drawing everything to the screen
+    # Done after drawing everything to the screen
     pygame.display.flip()
+
 
 # plt.plot(timeV, maxTV)
 # plt.show()

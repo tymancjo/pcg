@@ -160,11 +160,17 @@ def add_slice(T, dP, vV, m_ID, this_slice):
     adding another layer in 3D to the solution arrays, by copy the last slice.
     returning the same set of arrays but now in 3d d- dimension (rows,cols,depth)
     """
-    T = np.dstack([T, np.copy(T[:, :, this_slice])])
-    dP = np.dstack([dP, np.copy(dP[:, :, this_slice])])
-    vV = np.dstack([vV, np.copy(vV[:, :, this_slice])])
-    m_ID = np.dstack([m_ID, np.copy(m_ID[:, :, this_slice])]).astype(int)
+    if T.ndim > 2:
+        T = np.dstack([T, np.copy(T[:, :, this_slice])])
+        dP = np.dstack([dP, np.copy(dP[:, :, this_slice])])
+        vV = np.dstack([vV, np.copy(vV[:, :, this_slice])])
+        m_ID = np.dstack([m_ID, np.copy(m_ID[:, :, this_slice])]).astype(int)
 
+    else:
+        T = np.dstack([T, np.copy(T)])
+        dP = np.dstack([dP, np.copy(dP)])
+        vV = np.dstack([vV, np.copy(vV)])
+        m_ID = np.dstack([m_ID, np.copy(m_ID)]).astype(int)
     return T, dP, vV, m_ID
 
 
@@ -479,7 +485,7 @@ def solve_3d_conv(T_array, m_ID, vV, gas_array, dx, N=1, dt=1 / 100):
                                 )
                                 # vV[r, c] = 0
 
-                            ##### 3D
+                            # 3D
                             # Up next slice
                             elif (
                                 T_array[r, c, s] > T_array[r - 1, c, s + 1]
@@ -511,7 +517,7 @@ def solve_3d_conv(T_array, m_ID, vV, gas_array, dx, N=1, dt=1 / 100):
                                     vV[r, c, s],
                                     vV[r - 1, c, s - 1],
                                 )
-                            ##### end of the 3D depth moves
+                            # end of the 3D depth moves
 
                             # -left
                             elif (
