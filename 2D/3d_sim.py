@@ -729,6 +729,17 @@ while running:
                 pygame.Rect(this_slice * 10 * pixelCellW + hW, 3, 1, rows * pixelCellH),
             )
 
+            pygame.draw.rect(
+                screen,
+                (255, 255, 255),
+                pygame.Rect(
+                    pixelCellW * front_display_row + offset_pix_x,
+                    3,
+                    1,
+                    rows * pixelCellH + offset_pix_y,
+                ),
+            )
+
         if editMode:
             if drawing:
                 # taking care of the edit drawings
