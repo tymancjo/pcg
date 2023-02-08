@@ -67,6 +67,8 @@ theGrid = [
 # pre processor to prepare the arrays
 T, dP, m_ID, vV = pcg.pre_processor(theGrid)
 dispVal = T
+this_slice = 0
+number_of_slices = 1
 
 
 # initial global conditions ##############
@@ -107,6 +109,7 @@ nowIs = 0
 fieldDrawMode = 0
 filedName = "Delta T [K]"
 fast_display = 0
+front_display = False
 
 move_vector = [0, 0]
 move_frame = 0
@@ -121,24 +124,24 @@ source_power = 0
 # vectorization of functions
 CLRS = np.array(cc.cmap)
 
-## initialize pygame and create window
+# initialize pygame and create window
 pygame.init()
-pygame.mixer.init()  ## For sound
+pygame.mixer.init()  # For sound
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Particle Cell Grid")
-clock = pygame.time.Clock()  ## For syncing the FPS
+clock = pygame.time.Clock()  # For syncing the FPS
 font = pygame.font.Font(pygame.font.get_default_font(), 12)
 
 
-## Simulation animation main loop
+# Simulation animation main loop
 running = True
 
 while running:
     # 1 Process input/events
-    clock.tick(FPS)  ## will make the loop run at the same speed all the time
+    clock.tick(FPS)  # will make the loop run at the same speed all the time
     for event in pygame.event.get():
         # gets all the events which have occurred till now and keeps tab of them.
-        ## listening for the the X button at the top
+        # listening for the the X button at the top
         if event.type == pygame.QUIT:
             running = False
 
@@ -196,6 +199,27 @@ while running:
                     zoom = 1
                     zoom_left = zoom_top = 0
                     zoom_right = zoom_bottom = grid_size
+
+            if event.key == pygame.K_RIGHTBRACKET:
+                this_slice += 1
+                if this_slice >= number_of_slices:
+                    this_slice = number_of_slices - 1
+
+            if event.key == pygame.K_LEFTBRACKET:
+                this_slice -= 1
+                this_slice = max(0, this_slice)
+
+            if event.key == pygame.K_s:
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_SHIFT:
+                    front_display = not front_display
+                    if front_display:
+                        front_display_row = min(mouseCol, mouseC)
+                else:
+                    T, dP, vV, m_ID = pcg.add_slice(T, dP, vV, m_ID, this_slice)
+
+            if event.key == pygame.K_c:
+                pass
 
             if event.key == pygame.K_g:
                 if g:
@@ -261,6 +285,10 @@ while running:
                             maxTV,
                         ) = dane.get_data()
                         simTime = timeV[-1]
+                        if T.ndim > 2:
+                            number_of_slices = T.shape[2]
+                        else:
+                            number_of_slices = 1
 
                         # just hacking the steel color:
                         m_colors[1] = (25, 25, 25)
@@ -512,16 +540,44 @@ while running:
             screen, (25, 25, 50), pygame.Rect(0, 0, screen_size0, screen_size0)
         )
 
-        if fieldDrawMode == 0:
-            dispVal = T[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
-            filedName = "Delta T [K]"
-        elif fieldDrawMode == 1:
-            dispVal = vV[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
-            filedName = "Velocity [m/s]"
-        elif fieldDrawMode == 2:
-            dispVal = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
-            filedName = "Power Losses [W/m]"
-        currentMax = dispVal.max()
+        if T.ndim < 3:
+            if fieldDrawMode == 0:
+                dispVal = T[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+                filedName = "Delta T [K]"
+            elif fieldDrawMode == 1:
+                dispVal = vV[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+                filedName = "Velocity [m/s]"
+            elif fieldDrawMode == 2:
+                dispVal = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+                filedName = "Power Losses [W/m]"
+
+            thisID = m_ID[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+            this_dP = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
+
+        else:
+            # we have 3d arrays
+            number_of_slices = T.shape[2]
+            if this_slice >= number_of_slices:
+                this_slice = number_of_slices - 1
+
+            if fieldDrawMode == 0:
+                dispVal = T[zoom_top:zoom_bottom:, zoom_left:zoom_right:, this_slice]
+                filedName = "Delta T [K]"
+            elif fieldDrawMode == 1:
+                dispVal = vV[zoom_top:zoom_bottom:, zoom_left:zoom_right:, this_slice]
+                filedName = "Velocity [m/s]"
+            elif fieldDrawMode == 2:
+                dispVal = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:, this_slice]
+                filedName = "Power Losses [W/m]"
+
+            thisID = m_ID[zoom_top:zoom_bottom:, zoom_left:zoom_right:, this_slice]
+            this_dP = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:, this_slice]
+
+        rows, cols = dispVal.shape
+        if fieldDrawMode:
+            currentMax = dispVal.max()
+        else:
+            currentMax = T.max()
 
         # ################### #
         # handling scrolling: #
@@ -542,10 +598,6 @@ while running:
 
         if move_frame > 5:
             move_frame = 0
-
-        thisID = m_ID[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
-        this_dP = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
-        rows, cols = dispVal.shape
 
         pixelCellH = pixelCellW = math.floor(
             min(screen_size0 / rows, screen_size0 / cols)
@@ -586,34 +638,107 @@ while running:
                     pos_x = pixelCellW * c + offset_pix_x
                     pos_y = pixelCellH * r + offset_pix_y
 
-                    if m_gas[thisID[r, c]] or viewMode == 2:
-                        # avT = T[r, c - 1 : c + 2].sum() / 3
-                        # color = pcg.getColor(avT, 0, currentMax)
-                        color = pcg.getColor(dispVal[r, c], 0, currentMax)
-                        if viewMode == 1:
-                            color = m_colors[thisID[r, c]]
+                    if thisID.ndim < 3:
+                        if m_gas[thisID[r, c]] or viewMode == 2:
+                            # avT = T[r, c - 1 : c + 2].sum() / 3
+                            # color = pcg.getColor(avT, 0, currentMax)
+                            color = pcg.getColor(dispVal[r, c], 0, currentMax)
+                            if viewMode == 1:
+                                color = m_colors[thisID[r, c]]
 
-                        pygame.draw.rect(
-                            screen,
-                            color,
-                            pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
-                        )
-                    else:
-
-                        color = pcg.getColor(dispVal[r, c], 0, currentMax)
-                        pygame.draw.rect(
-                            screen,
-                            m_colors[thisID[r, c]],
-                            pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
-                        )
-                        if viewMode != 1:
                             pygame.draw.rect(
                                 screen,
                                 color,
-                                pygame.Rect(
-                                    pos_x + 1, pos_y + 1, pixelCellW - 2, pixelCellH - 2
-                                ),
+                                pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
                             )
+                        else:
+
+                            color = pcg.getColor(dispVal[r, c], 0, currentMax)
+                            pygame.draw.rect(
+                                screen,
+                                m_colors[thisID[r, c]],
+                                pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
+                            )
+                            if viewMode != 1:
+                                pygame.draw.rect(
+                                    screen,
+                                    color,
+                                    pygame.Rect(
+                                        pos_x + 1,
+                                        pos_y + 1,
+                                        pixelCellW - 2,
+                                        pixelCellH - 2,
+                                    ),
+                                )
+                    else:
+                        if m_gas[thisID[r, c, this_slice]] or viewMode == 2:
+                            # avT = T[r, c - 1 : c + 2].sum() / 3
+                            # color = pcg.getColor(avT, 0, currentMax)
+                            color = pcg.getColor(dispVal[r, c], 0, currentMax)
+                            if viewMode == 1:
+                                color = m_colors[thisID[r, c, this_slice]]
+
+                            pygame.draw.rect(
+                                screen,
+                                color,
+                                pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
+                            )
+                        else:
+
+                            color = pcg.getColor(dispVal[r, c], 0, currentMax)
+                            pygame.draw.rect(
+                                screen,
+                                m_colors[thisID[r, c, this_slice]],
+                                pygame.Rect(pos_x, pos_y, pixelCellW, pixelCellH),
+                            )
+                            if viewMode != 1:
+                                pygame.draw.rect(
+                                    screen,
+                                    color,
+                                    pygame.Rect(
+                                        pos_x + 1,
+                                        pos_y + 1,
+                                        pixelCellW - 2,
+                                        pixelCellH - 2,
+                                    ),
+                                )
+        if front_display and T.ndim > 2:
+            # let's show the front back xcut of the system
+
+            front_display_array = T[:, front_display_row, :]
+            normalized_front_display_array = (
+                255 * front_display_array.T / (T.max() + 1e-15)
+            ).astype(np.int16)
+
+            R_to_blit = CLRS[normalized_front_display_array, 0]
+            G_to_blit = CLRS[normalized_front_display_array, 1]
+            B_to_blit = CLRS[normalized_front_display_array, 2]
+
+            RGB_to_blit = np.dstack([R_to_blit, G_to_blit, B_to_blit])
+            RGB_to_blit = pygame.surfarray.make_surface(RGB_to_blit)
+            RGB_to_blit = pygame.transform.scale(
+                RGB_to_blit, (10 * number_of_slices * pixelCellW, rows * pixelCellH)
+            )
+            screen.blit(RGB_to_blit, dest=(0, 0))
+
+            hW = int(pixelCellW / 2) * 10
+
+            pygame.draw.rect(
+                screen,
+                (255, 255, 255),
+                pygame.Rect(this_slice * 10 * pixelCellW + hW, 3, 1, rows * pixelCellH),
+            )
+
+            pygame.draw.rect(
+                screen,
+                (255, 255, 255),
+                pygame.Rect(
+                    pixelCellW * front_display_row + offset_pix_x,
+                    3,
+                    1,
+                    rows * pixelCellH + offset_pix_y,
+                ),
+            )
 
         if editMode:
             if drawing:
@@ -662,7 +787,16 @@ while running:
 
             vV = np.zeros(T.shape)  # clearing the velocity vector
             ######
-            pcg.solve_cond_with_v(T, dP, vV, m_ID, m_massCp, m_Rth, m_gas, dx, dt, g)
+            if T.ndim > 2:
+                # using the solver for 3D case
+                pcg.solve_3d_cond_with_v(
+                    T, dP, vV, m_ID, m_massCp, m_Rth, m_gas, dx, dt, g
+                )
+            else:
+                # the 2D case solver
+                pcg.solve_cond_with_v(
+                    T, dP, vV, m_ID, m_massCp, m_Rth, m_gas, dx, dt, g
+                )
             ######
             pcg.open_air_boundary(T, vV)
             ######
@@ -691,7 +825,10 @@ while running:
             s = vV.max() * dt
 
         if s > 0:
-            pcg.solve_conv(T, m_ID, vV, m_gas, dx, N, dt)
+            if T.ndim < 3:
+                pcg.solve_conv(T, m_ID, vV, m_gas, dx, N, dt)
+            else:
+                pcg.solve_3d_conv(T, m_ID, vV, m_gas, dx, N, dt)
 
             if s > dx / 2:
                 N = math.floor(s / dx) + 1
@@ -712,6 +849,7 @@ while running:
 
         mouseRow = max(0, min(mouseRow, dispVal.shape[0] - 1))
         mouseCol = max(0, min(mouseCol, dispVal.shape[1] - 1))
+
         reading = dispVal[mouseRow][mouseCol]
         material = m_name[thisID[mouseRow][mouseCol]]
         powerloss = this_dP[mouseRow][mouseCol]
@@ -827,10 +965,17 @@ while running:
     for i, mat in enumerate(m_name):
         text_string = f"{i+1}: {mat}".encode()
         text_surface = font.render(text_string, True, (255, 255, 255))
-        screen.blit(text_surface, dest=(navi_left, tT + (tN + i) * dT))
+        screen.blit(text_surface, dest=(navi_left, tT + (tN) * dT))
+        tN += 1
 
-    ## Done after drawing everything to the screen
+    tN += 2
+    text_string = f"Slice: {this_slice+1} of {number_of_slices}".encode()
+    text_surface = font.render(text_string, True, (255, 255, 255))
+    screen.blit(text_surface, dest=(navi_left, tT + tN * dT))
+
+    # Done after drawing everything to the screen
     pygame.display.flip()
+
 
 # plt.plot(timeV, maxTV)
 # plt.show()
