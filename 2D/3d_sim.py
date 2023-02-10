@@ -1,7 +1,10 @@
 import pygame
 import math
 import numpy as np
-import matplotlib.pyplot as plt
+
+# import matplotlib.pyplot as plt
+# import plotly.express as px
+import plotly.graph_objects as go
 
 import pcg_v2 as pcg
 import materials as mt
@@ -239,8 +242,58 @@ while running:
 
             if event.key == pygame.K_p:
                 if editMode:
-                    plt.plot(timeV, maxTV)
-                    plt.show()
+                    mods = pygame.key.get_mods()
+                    if mods & pygame.KMOD_SHIFT:
+                        # showing the 3d volumetric plot of the temperature.
+                        # T_scaled = np.repeat(T, 10, axis=2)
+                        T_scaled = T
+                        Tz, Ty, Tx = T_scaled.shape
+                        Txyz_max = max(Tx, Ty, Tz)
+
+                        X, Y, Z = np.mgrid[
+                            :Tx,
+                            :Ty,
+                            :Tz,
+                        ]
+                        volume = T_scaled[Z, Y, X]
+
+                        fig3d = go.Figure(
+                            data=go.Volume(
+                                x=X.flatten(),
+                                y=Y.flatten(),
+                                z=Z.flatten(),
+                                value=volume.flatten(),
+                                isomin=0,
+                                isomax=T.max(),
+                                opacity=0.1,
+                                surface_count=21,
+                                colorscale="Turbo",
+                            )
+                        )
+                        fig3d.update_layout(
+                            scene={
+                                "zaxis": {
+                                    "autorange": "reversed"
+                                },  # reverse automatically
+                                # 'yaxis': {'range': (100, 0)},       # manually set certain range in reverse order
+                            },
+                            scene_aspectmode="manual",
+                            scene_aspectratio=dict(
+                                x=Tx * 10 / Txyz_max,
+                                y=Ty / Txyz_max,
+                                z=Tz / Txyz_max,
+                            ),
+                        )
+                        fig3d.show()
+                        pass
+
+                    else:
+                        # the 2d plot of max temperature
+                        # plt.plot(timeV, maxTV)
+                        # plt.show()
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(x=timeV, y=maxTV))
+                        fig.show()
 
             if event.key == pygame.K_w:
                 if editMode:
