@@ -154,11 +154,14 @@ while running:
         # v - cycle over view modes - result field with shapes, materials, just result field
         # f - cycle over normal and fast (grayscale) field display mode
         # p - [in edit mode] plots the temperature plot
+        # SHIFT p - [in edit mode] plots the 3d temperature volumetric plot
         # w = [in edit mode] save the simulation data - will ask about filename in terminal
         # l - [in edit mode] loads the simulation data - will ask about filename in terminal
         # q - [in edit mode] if pressed 5 times reset the solution to initial state.
         # d - [in edit mode] toggle drawing mode from rectangle to paint mode
         # d - [in sim mode] toggle the result field [Temperature, Velocity]
+        # SHIFT c - crop the analysis domain to marked size
+
         # z/x - zoom in and out
         # arrow keys - moving canvas in zoom mode
         #
@@ -221,9 +224,6 @@ while running:
                 else:
                     T, dP, vV, m_ID = pcg.add_slice(T, dP, vV, m_ID, this_slice)
 
-            if event.key == pygame.K_c:
-                pass
-
             if event.key == pygame.K_g:
                 if g:
                     g = 0
@@ -245,8 +245,8 @@ while running:
                     mods = pygame.key.get_mods()
                     if mods & pygame.KMOD_SHIFT:
                         # showing the 3d volumetric plot of the temperature.
-                        # T_scaled = np.repeat(T, 10, axis=2)
-                        T_scaled = T
+                        T_scaled = np.repeat(T, 5, axis=2)
+                        # T_scaled = T
                         Tz, Ty, Tx = T_scaled.shape
                         Txyz_max = max(Tx, Ty, Tz)
 
@@ -266,8 +266,9 @@ while running:
                                 isomin=0,
                                 isomax=T.max(),
                                 opacity=0.1,
-                                surface_count=21,
+                                surface_count=22,
                                 colorscale="Turbo",
+                                # opacityscale=[[0, 0], [0.1, 0], [0.3, 1], [1.1]],
                             )
                         )
                         fig3d.update_layout(
@@ -279,10 +280,12 @@ while running:
                             },
                             scene_aspectmode="manual",
                             scene_aspectratio=dict(
-                                x=Tx * 10 / Txyz_max,
+                                x=Tx / Txyz_max,
                                 y=Ty / Txyz_max,
                                 z=Tz / Txyz_max,
                             ),
+                            width=800,
+                            height=800,
                         )
                         fig3d.show()
                         pass
@@ -348,6 +351,24 @@ while running:
                         zoom = 1
                         zoom_left = zoom_top = 0
                         zoom_right = zoom_bottom = grid_size
+
+            if event.key == pygame.K_c:
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_SHIFT:
+                    # cropping the analysis doman size.
+                    start_c = min(mouseC, mouseCol)
+                    start_r = min(mouseR, mouseRow)
+                    end_c = max(mouseC, mouseCol)
+                    end_r = max(mouseR, mouseRow)
+
+                    if T.ndim > 2:
+                        T = T[start_r:end_r, start_c:end_c, :]
+                        dP = dP[start_r:end_r, start_c:end_c, :]
+                        m_ID = m_ID[start_r:end_r, start_c:end_c, :]
+                    else:
+                        T = T[start_r:end_r, start_c:end_c]
+                        dP = dP[start_r:end_r, start_c:end_c]
+                        m_ID = m_ID[start_r:end_r, start_c:end_c]
 
             if event.key == pygame.K_q:
                 if editMode:
