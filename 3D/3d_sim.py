@@ -71,10 +71,11 @@ T, dP, m_ID, vV = pcg.pre_processor(theGrid)
 dispVal = T
 this_slice = 0
 number_of_slices = 1
+slice_size = 1000
 
 
 # initial global conditions ##############
-dt = 1 / 10
+dt = 1 / 1000
 N = 6
 dx = theGrid[0][0].length
 g = 9.81
@@ -92,7 +93,7 @@ zoom_right = cols
 zoom_top = 0
 zoom_bottom = rows
 
-drawMode = 1
+drawMode = 0
 viewMode = 0
 stepsToDraw = 1
 simTime = 0
@@ -194,7 +195,7 @@ while running:
                     dP = np.zeros((grid_size, grid_size))
                     m_ID = np.zeros((grid_size, grid_size)).astype(int)
 
-                    dt = 1 / 10
+                    dt = 1 / 1000
                     dx = 10e-3
                     g = 9.81
                     timeV = [0]
@@ -220,6 +221,17 @@ while running:
                     front_display = not front_display
                     if front_display:
                         front_display_row = min(mouseCol, mouseC)
+
+                elif mods & pygame.KMOD_CTRL:
+                    new_slice_size = float(
+                        input(f"Set the slice size in mm [current: {slice_size}mm] :")
+                    )
+                    m_massCp = m_massCp * new_slice_size / slice_size
+                    m_Rth = m_Rth * new_slice_size / slice_size
+                    dP = dP * new_slice_size / slice_size
+
+                    slice_size = new_slice_size
+
                 else:
                     T, dP, vV, m_ID = pcg.add_slice(T, dP, vV, m_ID, this_slice)
 
@@ -243,32 +255,36 @@ while running:
                 if editMode:
                     mods = pygame.key.get_mods()
                     if mods & pygame.KMOD_CTRL:
+
+                        pcg.plot_3d_plt(m_ID, T, CLRS, m_id=selected_material, slices=2)
                         # showing the voxel data on the copper elements
                         # filtering the array to only take the copper one into account
-                        copper_array = np.repeat(m_ID, 5, axis=2) == 2
-                        T_scaled = np.repeat(T, 5, axis=2)
 
-                        indx = np.indices(copper_array.shape)
+                        # m_ID_scaled = np.repeat(m_ID, 5, axis=2)
+                        # copper_array = np.logical_or(m_ID_scaled == 2, m_ID_scaled == 1)
+                        # T_scaled = np.repeat(T, 5, axis=2)
 
-                        colors_array = (
-                            255 * T_scaled[tuple(indx)] / (T.max() + 1e-15)
-                        ).astype(int)
+                        # indx = np.indices(copper_array.shape)
 
-                        # combine the color components
-                        colors = np.zeros(colors_array.shape + (3,))
-                        colors = CLRS[colors_array] / 255
+                        # colors_array = (
+                        #     255 * T_scaled[tuple(indx)] / (T.max() + 1e-15)
+                        # ).astype(int)
 
-                        # copper_array = np.repeat(copper_array, 6, axis=2)
-                        # colors = np.repeat(colors_array, 6, axis=2)
+                        # # combine the color components
+                        # colors = np.zeros(colors_array.shape + (3,))
+                        # colors = CLRS[colors_array] / 255
 
-                        rot_axes = (2, 0)
-                        copper_array = np.rot90(copper_array, k=1, axes=rot_axes)
-                        colors = np.rot90(colors, k=1, axes=rot_axes)
+                        # # copper_array = np.repeat(copper_array, 6, axis=2)
+                        # # colors = np.repeat(colors_array, 6, axis=2)
 
-                        ax = plt.figure().add_subplot(projection="3d")
-                        ax.voxels(copper_array, facecolors=colors, edgecolor="none")
-                        ax.set_aspect("equal")
-                        plt.show()
+                        # rot_axes = (2, 0)
+                        # copper_array = np.rot90(copper_array, k=1, axes=rot_axes)
+                        # colors = np.rot90(colors, k=1, axes=rot_axes)
+
+                        # ax = plt.figure().add_subplot(projection="3d")
+                        # ax.voxels(copper_array, facecolors=colors, edgecolor="none")
+                        # ax.set_aspect("equal")
+                        # plt.show()
 
                     elif mods & pygame.KMOD_SHIFT:
                         # showing the 3d volumetric plot of the temperature.
@@ -712,9 +728,10 @@ while running:
             # Idea - prepare a np array of colors and blit it to screen
             if fast_display == 1:
                 # the full colormap
-                normalizer_dispVal = (255 * dispVal.T / (dispVal.max() + 1e-15)).astype(
-                    np.int16
-                )
+                normalizer_dispVal = np.clip(
+                    255 * dispVal.T / (dispVal.max() + 1e-15), 0, 255
+                ).astype(np.int16)
+
                 R_to_blit = CLRS[normalizer_dispVal, 0]
                 G_to_blit = CLRS[normalizer_dispVal, 1]
                 B_to_blit = CLRS[normalizer_dispVal, 2]
@@ -886,6 +903,8 @@ while running:
     if not editMode:
         if True:
 
+            this_max = T.max()
+
             vV = np.zeros(T.shape)  # clearing the velocity vector
             ######
             if T.ndim > 2:
@@ -898,6 +917,8 @@ while running:
                 pcg.solve_cond_with_v(
                     T, dP, vV, m_ID, m_massCp, m_Rth, m_gas, dx, dt, g
                 )
+            ##### quick fix to NaN in the solution T array
+            T = np.nan_to_num(T)
             ######
             pcg.open_air_boundary(T, vV)
             ######
@@ -911,6 +932,11 @@ while running:
                 frameRatio = dt / frameTime
             else:
                 frameRatio = 0
+
+            # if this stem max T difference is more than assumed - need to fix
+            this_step_dT = abs(T.max() - this_max)
+            if this_step_dT > 0:
+                dt = dt * 1 / this_step_dT
 
             ##############
             # this piece is potentially slow - so maybe will be dropped
@@ -944,9 +970,11 @@ while running:
                     s = vV.max() * dt
                     N = math.floor(s / dx) + 1
 
-                # N = max(2, N)
-                # if dt < 1 / 50_000:
-                #     dt = 1 / 1000
+        # dt = max(1 / 1000, min(1 / 10, dt))
+
+        # N = max(2, N)
+        # if dt < 1 / 50_000:
+        #     dt = 1 / 1000
 
         mouseRow = max(0, min(mouseRow, dispVal.shape[0] - 1))
         mouseCol = max(0, min(mouseCol, dispVal.shape[1] - 1))

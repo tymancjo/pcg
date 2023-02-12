@@ -3,6 +3,7 @@ import cmap as cc
 import pickle
 import numpy as np
 from numba import njit
+import matplotlib.pyplot as plt
 
 CLRS = np.array(cc.cmap)
 
@@ -270,7 +271,11 @@ def solve_3d_cond_with_v(
         for r in range(1, rows - 1):
             for c in range(1, cols - 1):
                 # heat generation temp rise
-                T_array[r, c, s] += dP_array[r, c, s] * dt / massCp_array[m_ID[r, c, s]]
+
+                this_dP = dP_array[r, c, s]
+                if this_dP:
+                    DT = this_dP * dt / massCp_array[m_ID[r, c, s]]
+                    T_array[r, c, s] += DT
 
                 # Thermal conduction
                 # to the left
@@ -328,6 +333,7 @@ def solve_3d_cond_with_v(
                     v_array[r, c, s] += g * (((T_array[r, c, s] + 35) / 35) - 1) * dt
                 else:
                     v_array[r, c, s] = 0
+    # return dt
 
 
 @njit
@@ -595,3 +601,28 @@ def open_air_boundary(T_array, vV):
         T_array[:, 0] = 0
         T_array[:, -1] = 0
         vV[0, :] = 0
+
+
+def plot_3d_plt(m_ID, T, CLRS, m_id, slices=5):
+
+    m_ID_scaled = np.repeat(m_ID, slices, axis=2)
+    T_scaled = np.repeat(T, slices, axis=2)
+
+    # copper_array = np.logical_or(m_ID_scaled == m_id)
+    copper_array = m_ID_scaled == m_id
+    indx = np.indices(copper_array.shape)
+
+    colors_array = (255 * T_scaled[tuple(indx)] / (T.max() + 1e-15)).astype(int)
+
+    # combine the color components
+    colors = np.zeros(colors_array.shape + (3,))
+    colors = CLRS[colors_array] / 255
+
+    rot_axes = (2, 0)  # to orient the plot up-down
+    copper_array = np.rot90(copper_array, k=1, axes=rot_axes)
+    colors = np.rot90(colors, k=1, axes=rot_axes)
+
+    ax = plt.figure().add_subplot(projection="3d")
+    ax.voxels(copper_array, facecolors=colors, edgecolor="none")
+    ax.set_aspect("equal")
+    plt.show()
