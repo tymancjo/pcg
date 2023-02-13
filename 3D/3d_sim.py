@@ -226,9 +226,11 @@ while running:
                     new_slice_size = float(
                         input(f"Set the slice size in mm [current: {slice_size}mm] :")
                     )
-                    m_massCp = m_massCp * new_slice_size / slice_size
-                    m_Rth = m_Rth * new_slice_size / slice_size
-                    dP = dP * new_slice_size / slice_size
+                    k = new_slice_size / slice_size
+                    m_massCp = m_massCp * k
+                    m_Rth = m_Rth * (1 / k)
+                    dP = dP * k
+                    dt *= k
 
                     slice_size = new_slice_size
 
@@ -420,7 +422,8 @@ while running:
                         dKeyCount = 0
                         timeV = [0]
                         maxTV = [0]
-                        T[:, :] = 0.0
+                        T *= 0.0
+                        vV * 0.0
                         simTime = 0
 
             if event.key == pygame.K_d:
@@ -837,7 +840,7 @@ while running:
             RGB_to_blit = pygame.transform.scale(
                 RGB_to_blit, (10 * number_of_slices * pixelCellW, rows * pixelCellH)
             )
-            screen.blit(RGB_to_blit, dest=(0, 0))
+            screen.blit(RGB_to_blit, dest=(0, offset_pix_y))
 
             hW = int(pixelCellW / 2) * 10
 
@@ -903,14 +906,24 @@ while running:
     if not editMode:
         if True:
 
-            this_max = T.max()
-
             vV = np.zeros(T.shape)  # clearing the velocity vector
+            prev_T = T.copy()  # keeping the current sate of the field
+
             ######
             if T.ndim > 2:
                 # using the solver for 3D case
                 pcg.solve_3d_cond_with_v(
-                    T, dP, vV, m_ID, m_massCp, m_Rth, m_gas, dx, dt, g
+                    T,
+                    dP,
+                    vV,
+                    m_ID,
+                    m_massCp,
+                    m_Rth,
+                    m_gas,
+                    dx,
+                    dt,
+                    g,
+                    slice_size=slice_size,
                 )
             else:
                 # the 2D case solver
@@ -923,33 +936,43 @@ while running:
             pcg.open_air_boundary(T, vV)
             ######
 
-            simTime += dt
-
-            frameTime = (pygame.time.get_ticks() - nowIs) / 1000
-            nowIs = pygame.time.get_ticks()
-
-            if frameTime != 0:
-                frameRatio = dt / frameTime
-            else:
-                frameRatio = 0
-
             # if this stem max T difference is more than assumed - need to fix
-            this_step_dT = abs(T.max() - this_max)
-            if this_step_dT > 0:
-                dt = dt * 1 / this_step_dT
+            this_step_dT = abs(T.max() - prev_T.max())
+            print(f"{this_step_dT:10.4e} / {dt:10.4e}", end="\r")
 
-            ##############
-            # this piece is potentially slow - so maybe will be dropped
-            frameRatioV.append(frameRatio)
-            if len(frameRatioV) > 100:
-                frameRatioV.pop(0)
-            frameRatio = sum(frameRatioV) / len(frameRatioV)
-            ################
+            if this_step_dT > 10:
+                dt = dt * 10 / this_step_dT
+                dt = max(1 / 500, min(1 / 50, dt))
+                vV[:] = 0
+                s = 0
+                T = prev_T.copy()
+            else:
+                simTime += dt
 
-            timeV.append(simTime)
-            maxTV.append(T.max())
+                frameTime = (pygame.time.get_ticks() - nowIs) / 1000
+                nowIs = pygame.time.get_ticks()
 
-            s = vV.max() * dt
+                if frameTime != 0:
+                    frameRatio = dt / frameTime
+                else:
+                    frameRatio = 0
+
+                ##############
+                # this piece is potentially slow - so maybe will be dropped
+                frameRatioV.append(frameRatio)
+                if len(frameRatioV) > 100:
+                    frameRatioV.pop(0)
+                frameRatio = sum(frameRatioV) / len(frameRatioV)
+                ################
+
+                timeV.append(simTime)
+                maxTV.append(T.max())
+
+                s = vV.max() * dt
+
+                if this_step_dT < 0.1:
+                    dt = dt * 0.01 / this_step_dT
+                    dt = max(1 / 500, min(1 / 50, dt))
 
         if s > 0:
             if T.ndim < 3:
@@ -970,7 +993,7 @@ while running:
                     s = vV.max() * dt
                     N = math.floor(s / dx) + 1
 
-        # dt = max(1 / 1000, min(1 / 10, dt))
+                dt = max(1 / 500, min(1 / 50, dt))
 
         # N = max(2, N)
         # if dt < 1 / 50_000:

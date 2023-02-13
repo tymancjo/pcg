@@ -258,6 +258,7 @@ def solve_3d_cond_with_v(
     dx,
     dt=1 / 100,
     g=9.81,
+    slice_size=1000,
 ):
     # T, dP, m_ID, m_massCp, m_Rth, dt
     # checking if we got the arrays in 3D
@@ -320,9 +321,13 @@ def solve_3d_cond_with_v(
 
                 # to next slice (it this is not the last one)
                 if s < slices - 1:
+
+                    s_ratio = 2 * (slice_size / (dx * 1000)) ** 2
+
                     DT = T_array[r, c, s] - T_array[r, c, s + 1]
                     heatSigma = 1 / (
-                        Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r, c, s + 1]]
+                        s_ratio
+                        * (Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r, c, s + 1]])
                     )
                     dP = DT * heatSigma
                     dQ = dP * dt
