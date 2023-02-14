@@ -175,6 +175,22 @@ def add_slice(T, dP, vV, m_ID, this_slice):
     return T, dP, vV, m_ID
 
 
+def del_slice(T, dP, vV, m_ID, this_slice):
+    """
+    Removing another layer in 3D to the solution arrays, by copy the last slice.
+    returning the same set of arrays but now in 3d d- dimension (rows,cols,depth)
+    """
+    if T.ndim > 2:
+
+        T = np.delete(T, this_slice, axis=2)
+        dP = np.delete(dP, this_slice, axis=2)
+        m_ID = np.delete(m_ID, this_slice, axis=2)
+
+        vV = np.zeros(T.shape)
+
+    return T, dP, vV, m_ID
+
+
 @njit
 def solve_heat(T_array, dP_array, massCp_array, dt=1 / 100):
     rows, cols = T_array.shape
@@ -279,15 +295,15 @@ def solve_3d_cond_with_v(
                     T_array[r, c, s] += DT
 
                 # Thermal conduction
-                # to the left
-                DT = T_array[r, c, s] - T_array[r, c - 1, s]
-                heatSigma = 1 / (
-                    Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r, c - 1, s]]
-                )
-                dP = DT * heatSigma
-                dQ = dP * dt
-                T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
-                T_array[r, c - 1, s] += dQ / massCp_array[m_ID[r, c - 1, s]]
+                # # to the left
+                # DT = T_array[r, c, s] - T_array[r, c - 1, s]
+                # heatSigma = 1 / (
+                #     Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r, c - 1, s]]
+                # )
+                # dP = DT * heatSigma
+                # dQ = dP * dt
+                # T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
+                # T_array[r, c - 1, s] += dQ / massCp_array[m_ID[r, c - 1, s]]
 
                 # to the right
                 DT = T_array[r, c, s] - T_array[r, c + 1, s]
@@ -299,15 +315,15 @@ def solve_3d_cond_with_v(
                 T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
                 T_array[r, c + 1, s] += dQ / massCp_array[m_ID[r, c + 1, s]]
 
-                # to the top
-                DT = T_array[r, c, s] - T_array[r - 1, c, s]
-                heatSigma = 1 / (
-                    Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r - 1, c, s]]
-                )
-                dP = DT * heatSigma
-                dQ = dP * dt
-                T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
-                T_array[r - 1, c, s] += dQ / massCp_array[m_ID[r - 1, c, s]]
+                # # to the top
+                # DT = T_array[r, c, s] - T_array[r - 1, c, s]
+                # heatSigma = 1 / (
+                #     Rth_array[m_ID[r, c, s]] + Rth_array[m_ID[r - 1, c, s]]
+                # )
+                # dP = DT * heatSigma
+                # dQ = dP * dt
+                # T_array[r, c, s] -= dQ / massCp_array[m_ID[r, c, s]]
+                # T_array[r - 1, c, s] += dQ / massCp_array[m_ID[r - 1, c, s]]
 
                 # to the bottom
                 DT = T_array[r, c, s] - T_array[r + 1, c, s]

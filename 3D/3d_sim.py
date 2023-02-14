@@ -223,6 +223,7 @@ while running:
                         front_display_row = min(mouseCol, mouseC)
 
                 elif mods & pygame.KMOD_CTRL:
+                    print("")
                     new_slice_size = float(
                         input(f"Set the slice size in mm [current: {slice_size}mm] :")
                     )
@@ -258,39 +259,17 @@ while running:
                     mods = pygame.key.get_mods()
                     if mods & pygame.KMOD_CTRL:
 
-                        pcg.plot_3d_plt(m_ID, T, CLRS, m_id=selected_material, slices=2)
-                        # showing the voxel data on the copper elements
-                        # filtering the array to only take the copper one into account
-
-                        # m_ID_scaled = np.repeat(m_ID, 5, axis=2)
-                        # copper_array = np.logical_or(m_ID_scaled == 2, m_ID_scaled == 1)
-                        # T_scaled = np.repeat(T, 5, axis=2)
-
-                        # indx = np.indices(copper_array.shape)
-
-                        # colors_array = (
-                        #     255 * T_scaled[tuple(indx)] / (T.max() + 1e-15)
-                        # ).astype(int)
-
-                        # # combine the color components
-                        # colors = np.zeros(colors_array.shape + (3,))
-                        # colors = CLRS[colors_array] / 255
-
-                        # # copper_array = np.repeat(copper_array, 6, axis=2)
-                        # # colors = np.repeat(colors_array, 6, axis=2)
-
-                        # rot_axes = (2, 0)
-                        # copper_array = np.rot90(copper_array, k=1, axes=rot_axes)
-                        # colors = np.rot90(colors, k=1, axes=rot_axes)
-
-                        # ax = plt.figure().add_subplot(projection="3d")
-                        # ax.voxels(copper_array, facecolors=colors, edgecolor="none")
-                        # ax.set_aspect("equal")
-                        # plt.show()
+                        pcg.plot_3d_plt(
+                            m_ID,
+                            T,
+                            CLRS,
+                            m_id=selected_material,
+                            slices=int(slice_size / 10),
+                        )
 
                     elif mods & pygame.KMOD_SHIFT:
                         # showing the 3d volumetric plot of the temperature.
-                        T_scaled = np.repeat(T, 5, axis=2)
+                        T_scaled = np.repeat(T, int(slice_size / 10), axis=2)
                         # T_scaled = T
                         Tz, Ty, Tx = T_scaled.shape
                         Txyz_max = max(Tx, Ty, Tz)
@@ -388,6 +367,10 @@ while running:
                         simTime = timeV[-1]
                         if T.ndim > 2:
                             number_of_slices = T.shape[2]
+                            # figuring out slice size from the Rth
+                            # the copper material is index 2
+                            slice_size = 1000 * mt.copperCell.Rth / m_Rth[2]
+
                         else:
                             number_of_slices = 1
 
@@ -427,14 +410,20 @@ while running:
                         simTime = 0
 
             if event.key == pygame.K_d:
-                if editMode:
-                    drawMode += 1
-                    if drawMode > 1:
-                        drawMode = 0
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_CTRL:
+                    # CTRL+d to delete current slice
+                    T, dP, vV, m_ID = pcg.del_slice(T, dP, vV, m_ID, this_slice)
+
                 else:
-                    fieldDrawMode += 1
-                    if fieldDrawMode > 2:
-                        fieldDrawMode = 0
+                    if editMode:
+                        drawMode += 1
+                        if drawMode > 1:
+                            drawMode = 0
+                    else:
+                        fieldDrawMode += 1
+                        if fieldDrawMode > 2:
+                            fieldDrawMode = 0
 
                     # if colorsT:
                     #     dispVal = vV
@@ -652,6 +641,10 @@ while running:
     # 3Draw/render step count - to not draw each calculation step
     makeStep += 1
 
+    # calibratoin only
+    # T[100, 30] = 100  # constant temperature cell
+    # ########
+
     if makeStep > (stepsToDraw) or editMode:
         makeStep = 0
 
@@ -835,26 +828,35 @@ while running:
             G_to_blit = CLRS[normalized_front_display_array, 1]
             B_to_blit = CLRS[normalized_front_display_array, 2]
 
+            delta_x = slice_size * pixelCellW / (dx * 1000)
+
             RGB_to_blit = np.dstack([R_to_blit, G_to_blit, B_to_blit])
             RGB_to_blit = pygame.surfarray.make_surface(RGB_to_blit)
             RGB_to_blit = pygame.transform.scale(
-                RGB_to_blit, (10 * number_of_slices * pixelCellW, rows * pixelCellH)
+                RGB_to_blit,
+                (
+                    (
+                        delta_x * number_of_slices,
+                        rows * pixelCellH,
+                    ),
+                ),
             )
             screen.blit(RGB_to_blit, dest=(0, offset_pix_y))
 
-            hW = int(pixelCellW / 2) * 10
+            # hW = int(pixelCellW / 2) * dx * 1000
+            hW = int(delta_x / 2)
 
             pygame.draw.rect(
                 screen,
                 (255, 255, 255),
-                pygame.Rect(this_slice * 10 * pixelCellW + hW, 3, 1, rows * pixelCellH),
+                pygame.Rect(this_slice * delta_x + hW, 3, 1, rows * pixelCellH),
             )
 
             pygame.draw.rect(
                 screen,
                 (255, 255, 255),
                 pygame.Rect(
-                    pixelCellW * front_display_row + offset_pix_x,
+                    pixelCellW * front_display_row + offset_pix_x + int(pixelCellW / 2),
                     3,
                     1,
                     rows * pixelCellH + offset_pix_y,
@@ -935,6 +937,9 @@ while running:
             ######
             pcg.open_air_boundary(T, vV)
             ######
+
+            #### for calibration study only
+            # T[100, 30] = 100  # constant temperature cell
 
             # if this stem max T difference is more than assumed - need to fix
             this_step_dT = abs(T.max() - prev_T.max())
