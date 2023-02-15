@@ -152,8 +152,9 @@ while running:
         # space - simulation/edit mode toggle
         # g - turn on/off gravity
         # v - cycle over view modes - result field with shapes, materials, just result field
-        # f - cycle over normal and fast (grayscale) field display mode
+        # f - cycle over normal and fast ( color and grayscale) field display mode
         # p - [in edit mode] plots the temperature plot
+        # CTRL p - [in edit mode] plot 3d mesh of currently selected material cell
         # SHIFT p - [in edit mode] plots the 3d temperature volumetric plot
         # w = [in edit mode] save the simulation data - will ask about filename in terminal
         # l - [in edit mode] loads the simulation data - will ask about filename in terminal
@@ -161,6 +162,11 @@ while running:
         # d - [in edit mode] toggle drawing mode from rectangle to paint mode
         # d - [in sim mode] toggle the result field [Temperature, Velocity]
         # SHIFT c - crop the analysis domain to marked size
+        # SHIFT r - reset the canvas and all simulation to empty
+        # s - add another slice in 3d based on current selected slice
+        # CTRL s - ask in console for a slice size in [mm]
+        # SHIFT s - toggle the front view display (it use the last mouse click to determine the cur plane)
+        # [ ] - brackets - move between slices in 3d.
 
         # z/x - zoom in and out
         # arrow keys - moving canvas in zoom mode
@@ -194,6 +200,8 @@ while running:
                     vV = np.zeros((grid_size, grid_size))
                     dP = np.zeros((grid_size, grid_size))
                     m_ID = np.zeros((grid_size, grid_size)).astype(int)
+                    slice_size = 1000
+                    number_of_slices = 0
 
                     dt = 1 / 1000
                     dx = 10e-3
@@ -424,13 +432,6 @@ while running:
                         fieldDrawMode += 1
                         if fieldDrawMode > 2:
                             fieldDrawMode = 0
-
-                    # if colorsT:
-                    #     dispVal = vV
-                    #     colorsT = False
-                    # else:
-                    #     dispVal = T
-                    #     colorsT = True
 
             if event.key == pygame.K_z:
                 zoom += 1
@@ -932,16 +933,15 @@ while running:
                 pcg.solve_cond_with_v(
                     T, dP, vV, m_ID, m_massCp, m_Rth, m_gas, dx, dt, g
                 )
-            ##### quick fix to NaN in the solution T array
+            ##### quick fix to NaN in the solution T array if any
             T = np.nan_to_num(T)
             ######
             pcg.open_air_boundary(T, vV)
             ######
 
-            #### for calibration study only
-            # T[100, 30] = 100  # constant temperature cell
-
             # if this stem max T difference is more than assumed - need to fix
+            # it's abut stability of the solution 
+
             this_step_dT = abs(T.max() - prev_T.max())
             print(f"{this_step_dT:10.4e} / {dt:10.4e}", end="\r")
 
@@ -999,10 +999,6 @@ while running:
                     N = math.floor(s / dx) + 1
 
                 dt = max(1 / 500, min(1 / 50, dt))
-
-        # N = max(2, N)
-        # if dt < 1 / 50_000:
-        #     dt = 1 / 1000
 
         mouseRow = max(0, min(mouseRow, dispVal.shape[0] - 1))
         mouseCol = max(0, min(mouseCol, dispVal.shape[1] - 1))
@@ -1132,9 +1128,5 @@ while running:
 
     # Done after drawing everything to the screen
     pygame.display.flip()
-
-
-# plt.plot(timeV, maxTV)
-# plt.show()
 
 pygame.quit()
