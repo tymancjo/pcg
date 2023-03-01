@@ -93,7 +93,7 @@ zoom_right = cols
 zoom_top = 0
 zoom_bottom = rows
 
-drawMode = 0
+drawMode = 1
 viewMode = 0
 stepsToDraw = 1
 simTime = 0
@@ -167,6 +167,11 @@ while running:
         # CTRL s - ask in console for a slice size in [mm]
         # SHIFT s - toggle the front view display (it use the last mouse click to determine the cur plane)
         # [ ] - brackets - move between slices in 3d.
+        # CTRL c - copy current slice to buffer
+        # CTRL v - paste data from buffer as new slice - next to current one
+        # CTRL x - cut current slice and store it in the buffer
+        # CTRL SHIFT c - copy selection on local slice to the buffer
+        # CTRL SHIFT v - paste buffer on local slice starting from top left most position of the selection box
 
         # z/x - zoom in and out
         # arrow keys - moving canvas in zoom mode
@@ -215,13 +220,23 @@ while running:
                     zoom_right = zoom_bottom = grid_size
 
             if event.key == pygame.K_RIGHTBRACKET:
-                this_slice += 1
-                if this_slice >= number_of_slices:
-                    this_slice = number_of_slices - 1
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_SHIFT:
+                    front_display_row += 1
+                    front_display_row = min(front_display_row, T.shape[1] - 1)
+                else:
+                    this_slice += 1
+                    if this_slice >= number_of_slices:
+                        this_slice = number_of_slices - 1
 
             if event.key == pygame.K_LEFTBRACKET:
-                this_slice -= 1
-                this_slice = max(0, this_slice)
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_SHIFT:
+                    front_display_row -= 1
+                    front_display_row = max(front_display_row, 0)
+                else:
+                    this_slice -= 1
+                    this_slice = max(0, this_slice)
 
             if event.key == pygame.K_s:
                 mods = pygame.key.get_mods()
@@ -251,11 +266,6 @@ while running:
                     g = 0
                 else:
                     g = 9.81
-
-            if event.key == pygame.K_v:
-                viewMode += 1
-                if viewMode > 2:
-                    viewMode = 0
 
             if event.key == pygame.K_f:
                 fast_display += 1
@@ -356,6 +366,7 @@ while running:
 
             if event.key == pygame.K_l:
                 if editMode:
+                    print("Load file: ")
                     dane = pcg.load_data()
                     if dane:
                         (
@@ -387,10 +398,36 @@ while running:
                         zoom = 1
                         zoom_left = zoom_top = 0
                         zoom_right = zoom_bottom = grid_size
+                        front_display_row = 0
 
             if event.key == pygame.K_c:
                 mods = pygame.key.get_mods()
-                if mods & pygame.KMOD_SHIFT:
+
+                if mods & pygame.KMOD_CTRL and mods & pygame.KMOD_SHIFT:
+                    # CTRL SHIFT C - local copy
+                    print("Local copy")
+                    start_c = min(mouseC, mouseCol)
+                    start_r = min(mouseR, mouseRow)
+                    end_c = max(mouseC, mouseCol)
+                    end_r = max(mouseR, mouseRow)
+
+                    if T.ndim > 2:
+                        the_copy_of_T = np.copy(
+                            T[start_r:end_r, start_c:end_c, this_slice]
+                        )
+                        the_copy_of_dP = np.copy(
+                            dP[start_r:end_r, start_c:end_c, this_slice]
+                        )
+                        the_copy_of_m_ID = np.copy(
+                            m_ID[start_r:end_r, start_c:end_c, this_slice]
+                        )
+
+                    else:
+                        the_copy_of_T = np.copy(T[start_r:end_r, start_c:end_c])
+                        the_copy_of_dP = np.copy(dP[start_r:end_r, start_c:end_c])
+                        the_copy_of_m_ID = np.copy(m_ID[start_r:end_r, start_c:end_c])
+
+                elif mods & pygame.KMOD_SHIFT:
                     # cropping the analysis doman size.
                     start_c = min(mouseC, mouseCol)
                     start_r = min(mouseR, mouseRow)
@@ -406,6 +443,70 @@ while running:
                         dP = dP[start_r:end_r, start_c:end_c]
                         m_ID = m_ID[start_r:end_r, start_c:end_c]
 
+                elif mods & pygame.KMOD_CTRL:
+                    # CTRL + C - copy current slice
+                    the_copy_of_T = np.copy(T[:, :, this_slice])
+                    the_copy_of_dP = np.copy(dP[:, :, this_slice])
+                    the_copy_of_m_ID = np.copy(m_ID[:, :, this_slice])
+
+            if event.key == pygame.K_v:
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_CTRL and mods & pygame.KMOD_SHIFT:
+                    # if the_copy_of_dP.any() and the_copy_of_T.any():
+                    if True:
+                        start_r = min(mouseR, mouseRow)
+                        start_c = min(mouseC, mouseCol)
+                        end_r = start_r + the_copy_of_T.shape[0]
+                        end_c = start_c + the_copy_of_T.shape[1]
+                        print(f"Local paste at {start_r, start_c}")
+
+                        if T.ndim > 2:
+                            T[start_r:end_r, start_c:end_c, this_slice] = the_copy_of_T
+                            dP[
+                                start_r:end_r, start_c:end_c, this_slice
+                            ] = the_copy_of_dP
+                            m_ID[
+                                start_r:end_r, start_c:end_c, this_slice
+                            ] = the_copy_of_m_ID
+                        else:
+                            T[start_r:end_r, start_c:end_c] = the_copy_of_T
+                            dP[start_r:end_r, start_c:end_c] = the_copy_of_dP
+                            m_ID[start_r:end_r, start_c:end_c] = the_copy_of_m_ID
+
+                elif mods & pygame.KMOD_CTRL:
+                    # CTRL + V place the copied slice as the next one.
+                    # if the_copy_of_dP.any() and the_copy_of_T.any():
+                    if True:
+                        T = np.dstack(
+                            [
+                                np.copy(T[:, :, : this_slice + 1]),
+                                the_copy_of_T,
+                                np.copy(T[:, :, this_slice + 1 :]),
+                            ]
+                        )
+
+                        dP = np.dstack(
+                            [
+                                np.copy(dP[:, :, : this_slice + 1]),
+                                the_copy_of_dP,
+                                np.copy(dP[:, :, this_slice + 1 :]),
+                            ]
+                        )
+
+                        m_ID = np.dstack(
+                            [
+                                np.copy(m_ID[:, :, : this_slice + 1]),
+                                the_copy_of_m_ID,
+                                np.copy(m_ID[:, :, this_slice + 1 :]),
+                            ]
+                        )
+                        number_of_slices = T.shape[2]
+                        this_slice = min(this_slice, number_of_slices - 1)
+                else:
+                    viewMode += 1
+                    if viewMode > 2:
+                        viewMode = 0
+
             if event.key == pygame.K_q:
                 if editMode:
                     dKeyCount += 1
@@ -417,21 +518,27 @@ while running:
                         vV * 0.0
                         simTime = 0
 
-            if event.key == pygame.K_d:
+            if event.key == pygame.K_x:
                 mods = pygame.key.get_mods()
                 if mods & pygame.KMOD_CTRL:
-                    # CTRL+d to delete current slice
-                    T, dP, vV, m_ID = pcg.del_slice(T, dP, vV, m_ID, this_slice)
+                    # CTRL+x to copy to buffor and delete current slice
+                    the_copy_of_T = np.copy(T[:, :, this_slice])
+                    the_copy_of_dP = np.copy(dP[:, :, this_slice])
+                    the_copy_of_m_ID = np.copy(m_ID[:, :, this_slice])
 
+                    T, dP, vV, m_ID = pcg.del_slice(T, dP, vV, m_ID, this_slice)
+                    number_of_slices = T.shape[2]
+                    this_slice = min(this_slice, number_of_slices - 1)
+
+            if event.key == pygame.K_d:
+                if editMode:
+                    drawMode += 1
+                    if drawMode > 1:
+                        drawMode = 0
                 else:
-                    if editMode:
-                        drawMode += 1
-                        if drawMode > 1:
-                            drawMode = 0
-                    else:
-                        fieldDrawMode += 1
-                        if fieldDrawMode > 2:
-                            fieldDrawMode = 0
+                    fieldDrawMode += 1
+                    if fieldDrawMode > 2:
+                        fieldDrawMode = 0
 
             if event.key == pygame.K_z:
                 zoom += 1
@@ -940,7 +1047,7 @@ while running:
             ######
 
             # if this stem max T difference is more than assumed - need to fix
-            # it's abut stability of the solution 
+            # it's abut stability of the solution
 
             this_step_dT = abs(T.max() - prev_T.max())
             print(f"{this_step_dT:10.4e} / {dt:10.4e}", end="\r")
