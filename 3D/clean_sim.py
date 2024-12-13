@@ -545,7 +545,7 @@ while running:
 
         thisID = m_ID[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
         this_dP = dP[zoom_top:zoom_bottom:, zoom_left:zoom_right:]
-        rows, cols = dispVal.shape
+        rows, cols, _ = dispVal.shape
 
         pixelCellH = pixelCellW = math.floor(
             min(screen_size0 / rows, screen_size0 / cols)

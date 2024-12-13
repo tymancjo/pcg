@@ -9,6 +9,8 @@ import pcg_v2 as pcg
 import materials as mt
 import cmap as cc
 
+import mypygamegui as gui
+
 
 # material database for the solver
 # define the materials needed by making a list
@@ -24,7 +26,7 @@ m_colors = [c.color for c in materials]
 
 # Simulation grid size definition
 rows = 300
-cols = 60
+cols = 300
 
 # display and pixel data
 pixelSize = int(min(1000 / cols, 1000 / rows))
@@ -48,6 +50,14 @@ navi_size = 200  # px
 navi_start = WIDTH
 navi_left = navi_start + 10
 WIDTH += navi_size
+
+# making space for the gui
+gui_width = 110
+gui_height = HEIGHT - 10
+gui_x = WIDTH
+gui_y = 10
+WIDTH += gui_width
+
 
 # Defining the world grid ###############
 theGrid = [
@@ -116,7 +126,7 @@ front_display = False
 
 move_vector = [0, 0]
 move_frame = 0
-
+selectedCells = [0, 0, 0, 0]
 
 # initial text to put on screen
 reading = 0
@@ -134,6 +144,65 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Particle Cell Grid")
 clock = pygame.time.Clock()  # For syncing the FPS
 font = pygame.font.Font(pygame.font.get_default_font(), 12)
+
+# preparing the gui
+my_gui = gui.gui_box(gui_x, gui_y, gui_width, gui_height, screen)
+
+
+# helper functions
+def toggleEditMode():
+    global editMode
+    editMode = not editMode
+
+
+def toggleFastDisplay():
+    global fast_display
+
+    fast_display += 1
+    if fast_display > 2:
+        fast_display = 0
+
+def toggleViewMode():
+    global viewMode
+    viewMode += 1
+    if viewMode > 2:
+        viewMode = 0
+
+def toggleDisplayField():
+    global fieldDrawMode
+    fieldDrawMode += 1
+    if fieldDrawMode > 2:
+        fieldDrawMode = 0
+
+def toggleGravity():
+    global g
+    if g:
+        g = 0
+    else:
+        g = 9.81
+
+y = 5
+btn = gui.gui_btn(5, y, 100, 30, "START/STOP", toggleEditMode, color=(25,125,25))
+my_gui.addElement(btn)
+
+y += 35
+btn = gui.gui_btn(5, y, 100, 30, "Fast Display", toggleFastDisplay, color=(25,125,25))
+my_gui.addElement(btn)
+
+y += 35
+btn = gui.gui_btn(5, y, 100, 30, "View Mode", toggleViewMode, color=(25,125,25))
+my_gui.addElement(btn)
+
+y += 35
+btn = gui.gui_btn(5, y, 100, 30, "Display Field", toggleDisplayField, color=(25,125,25))
+my_gui.addElement(btn)
+
+
+
+y = HEIGHT - 200
+btn = gui.gui_btn(5, y, 100, 30, "toggle g", toggleGravity, color=(25,125,25))
+my_gui.addElement(btn)
+
 
 
 # Simulation animation main loop
@@ -192,7 +261,8 @@ while running:
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                editMode = not editMode
+                # editMode = not editMode
+                toggleEditMode()
 
             if event.key == pygame.K_r:
                 mods = pygame.key.get_mods()
@@ -262,15 +332,10 @@ while running:
                     T, dP, vV, m_ID = pcg.add_slice(T, dP, vV, m_ID, this_slice)
 
             if event.key == pygame.K_g:
-                if g:
-                    g = 0
-                else:
-                    g = 9.81
+                toggleGravity()
 
             if event.key == pygame.K_f:
-                fast_display += 1
-                if fast_display > 2:
-                    fast_display = 0
+                toggleFastDisplay()
 
             if event.key == pygame.K_p:
                 if editMode:
@@ -462,12 +527,12 @@ while running:
 
                         if T.ndim > 2:
                             T[start_r:end_r, start_c:end_c, this_slice] = the_copy_of_T
-                            dP[
-                                start_r:end_r, start_c:end_c, this_slice
-                            ] = the_copy_of_dP
-                            m_ID[
-                                start_r:end_r, start_c:end_c, this_slice
-                            ] = the_copy_of_m_ID
+                            dP[start_r:end_r, start_c:end_c, this_slice] = (
+                                the_copy_of_dP
+                            )
+                            m_ID[start_r:end_r, start_c:end_c, this_slice] = (
+                                the_copy_of_m_ID
+                            )
                         else:
                             T[start_r:end_r, start_c:end_c] = the_copy_of_T
                             dP[start_r:end_r, start_c:end_c] = the_copy_of_dP
@@ -503,9 +568,7 @@ while running:
                         number_of_slices = T.shape[2]
                         this_slice = min(this_slice, number_of_slices - 1)
                 else:
-                    viewMode += 1
-                    if viewMode > 2:
-                        viewMode = 0
+                    toggleViewMode()
 
             if event.key == pygame.K_q:
                 if editMode:
@@ -536,9 +599,7 @@ while running:
                     if drawMode > 1:
                         drawMode = 0
                 else:
-                    fieldDrawMode += 1
-                    if fieldDrawMode > 2:
-                        fieldDrawMode = 0
+                    toggleDisplayField()
 
             if event.key == pygame.K_z:
                 zoom += 1
@@ -717,6 +778,9 @@ while running:
             pos = pygame.mouse.get_pos()
             mx, my = pos
 
+            if my_gui.isOver(mx, my):
+                my_gui.highlight(mx, my)
+
             if mx < navi_start and (offset_pix_x <= mx and offset_pix_y <= my):
                 mx -= offset_pix_x
                 my -= offset_pix_y
@@ -745,6 +809,8 @@ while running:
                 drawing = False
                 if drawMode > 0:
                     selectedCells = [mouseCol, mouseRow, mouseC, mouseR]
+            if my_gui.isOver(mx, my):
+                my_gui.action(mx, my)
 
     # 3Draw/render step count - to not draw each calculation step
     makeStep += 1
@@ -993,7 +1059,7 @@ while running:
                             (POS[0], POS[1]),
                             (POS[2], POS[3]),
                         )
-            elif selectedCells and drawMode == 1:
+            elif selectedCells: #and drawMode == 1:
                 # rectangle stuff
                 Xs = selectedCells[0] * pixelCellW + offset_pix_x
                 Ys = selectedCells[1] * pixelCellH + offset_pix_y
@@ -1050,7 +1116,7 @@ while running:
             # it's abut stability of the solution
 
             this_step_dT = abs(T.max() - prev_T.max())
-            print(f"{this_step_dT:10.4e} / {dt:10.4e}", end="\r")
+            # print(f"{this_step_dT:10.4e} / {dt:10.4e}", end="\r")
 
             if this_step_dT > 10:
                 dt = dt * 10 / this_step_dT
@@ -1118,6 +1184,9 @@ while running:
     else:
         pass
         # pygame.draw.rect(screen, (255, 0, 0), pygame.Rect(navi_start, 0, 10, 10))
+
+    # gui part
+    my_gui.draw()
 
     # Navi pane
     color = (25, 75, 25)
